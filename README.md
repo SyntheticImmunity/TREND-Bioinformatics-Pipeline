@@ -1,5 +1,7 @@
 # TREND — Transcription-Factor-Responsive Enhancer Discovery
 
+> **📋 Reviewers, start here:** [`REVIEWERS.md`](REVIEWERS.md) — the 5-to-30-minute path from "I received a URL" to "I have verified the published claims on my own machine."
+
 End-to-end pipeline + interactive dashboard for the TREND enhancer-screening platform described in [the manuscript](#citation). One install, one command per experiment, one folder per result. Runs on a workstation, an HPC cluster, or a Mac/PC laptop — same code, same outputs.
 
 > **Status:** Phase 1 dashboard + v2 CLI / Snakemake workflow / conda packaging are implemented and tested. See `DASHBOARD_PRD.md` and `~/.claude/plans/now-i-want-you-quizzical-mountain.md` for the build plan and decision log.
