@@ -2,7 +2,11 @@
 
 > **📋 Reviewers, start here:** [`REVIEWERS.md`](REVIEWERS.md) — the 5-to-30-minute path from "I received a URL" to "I have verified the published claims on my own machine."
 >
-> **Note for reviewers:** the GitHub URL above is private during the manuscript review period. Reviewers should use the **anonymous.4open.science URL** the journal sent with the manuscript, which mirrors this repository with author identities stripped. The GitHub URL becomes public after paper acceptance.
+> **Reviewers cannot access this GitHub URL during the review period** (it's private — you'll see a 404). Use the anonymized mirror instead:
+>
+> 🔗 **https://anonymous.4open.science/r/TREND-Bioinformatics-Pipeline**
+>
+> The anonymous URL serves the same code with author identities stripped, no GitHub account needed. After paper acceptance, this GitHub URL becomes public and the anonymous mirror is no longer necessary.
 
 End-to-end pipeline + interactive dashboard for the TREND enhancer-screening platform described in [the manuscript](#citation). One install, one command per experiment, one folder per result. Runs on a workstation, an HPC cluster, or a Mac/PC laptop — same code, same outputs.
 

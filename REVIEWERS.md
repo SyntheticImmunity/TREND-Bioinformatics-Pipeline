@@ -26,15 +26,13 @@ Tier 2 is the load-bearing reproducibility check — it's the one that confirms 
 
 ### Path 1 (recommended): the anonymous mirror
 
-You should have received an `anonymous.4open.science` URL along with the manuscript. It looks like:
+The journal forwarded you this URL alongside the manuscript:
 
-```
-https://anonymous.4open.science/r/TREND-Bioinformatics-Pipeline-XXXX/
-```
+> 🔗 **https://anonymous.4open.science/r/TREND-Bioinformatics-Pipeline**
 
-Open it in your browser. Click the **"Download Repository"** button at the top of the page. You get a ZIP with the full source code (with author identities stripped from commits). Unzip and `cd` into the folder.
+Open it in your browser. The README renders inline. To get the source code locally, click the **"Download Repository"** button at the top of the page — you'll get a ZIP with the full source (with author identities stripped from commits and identifying terms replaced with `XXXX-N` placeholders). Unzip and `cd` into the folder.
 
-If the journal didn't include this URL, please ask the editorial office — the GitHub URL alone won't work for review.
+The mirror auto-updates from the maintainers' private repo on a regular cadence — if the authors push fixes during the review cycle, you'll see them on your next visit (hard-refresh in the browser if needed).
 
 ### Path 2: the GitHub URL (if you've been added as a named collaborator)
 
