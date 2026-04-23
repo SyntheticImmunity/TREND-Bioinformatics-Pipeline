@@ -22,20 +22,32 @@ Tier 2 is the load-bearing reproducibility check — it's the one that confirms 
 
 ## Step 1 — Get the code
 
-### If you have `git` installed
+> **Reviewers should not use the GitHub URL directly** — the repository is private during the review period and you'll see a 404. Use the anonymous mirror URL the journal forwarded to you.
+
+### Path 1 (recommended): the anonymous mirror
+
+You should have received an `anonymous.4open.science` URL along with the manuscript. It looks like:
+
+```
+https://anonymous.4open.science/r/TREND-Bioinformatics-Pipeline-XXXX/
+```
+
+Open it in your browser. Click the **"Download Repository"** button at the top of the page. You get a ZIP with the full source code (with author identities stripped from commits). Unzip and `cd` into the folder.
+
+If the journal didn't include this URL, please ask the editorial office — the GitHub URL alone won't work for review.
+
+### Path 2: the GitHub URL (if you've been added as a named collaborator)
+
+If you have a GitHub account and the corresponding author has added you as a collaborator on the private repo:
 
 ```bash
 git clone https://github.com/SyntheticImmunity/TREND-Bioinformatics-Pipeline.git
 cd TREND-Bioinformatics-Pipeline
 ```
 
-### If you don't have `git`
+If `git clone` returns "Repository not found" or a 404 in the browser, you're hitting GitHub's standard private-repo response for non-collaborators — fall back to Path 1.
 
-On the GitHub page, click the green **"Code"** button → **"Download ZIP"**. Unzip it and `cd` into the folder.
-
-### If you received an `anonymous.4open.science` link instead of a GitHub URL
-
-Click the **"Download Repository"** button at the top of the anonymous page. You get a ZIP with the same contents as the GitHub clone. Unzip and `cd` into the folder.
+After the paper is accepted, the GitHub repo will become public and this URL will work for everyone.
 
 ---
 
