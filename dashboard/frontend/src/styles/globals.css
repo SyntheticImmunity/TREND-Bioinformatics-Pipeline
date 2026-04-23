@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base brand foundation per DESIGN.md: cream background, charcoal text, never pure white. */
+@layer base {
+  html {
+    background-color: #f7f4ed;
+    color: #1c1c1c;
+    font-family: theme("fontFamily.sans");
+    font-feature-settings: "ss01", "cv11"; /* Inter humanist alternates */
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-color: #f7f4ed;
+    min-height: 100dvh;
+  }
+
+  /* Headings default to weight 600 with the editorial letter-spacing rules from DESIGN.md. */
+  h1, h2, h3, h4 {
+    color: #1c1c1c;
+    font-weight: 600;
+  }
+
+  /* Links: charcoal with underline (no hover color change — decoration carries intent). */
+  a {
+    color: #1c1c1c;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center bg-charcoal text-cream-light
+           px-4 py-2 rounded-standard text-base
+           shadow-button-inset
+           transition-opacity active:opacity-80 focus-visible:shadow-focus
+           focus-visible:outline-none;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center bg-transparent text-charcoal
+           px-4 py-2 rounded-standard text-base
+           border border-charcoal-40
+           transition-opacity active:opacity-80 focus-visible:shadow-focus
+           focus-visible:outline-none;
+  }
+
+  .card {
+    @apply bg-cream border border-cream-border rounded-card p-6;
+  }
+}

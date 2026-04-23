@@ -1,0 +1,14 @@
+# R + R packages for Steps 8 and 9.
+# R version pinned to match the manuscript SBATCH (R 3.5.1) for reproducibility.
+# Note: r-base 3.5.1 may not be available on every channel; falling back to a
+# compatible 3.6.x series is acceptable per plan risk R-A — manifest records
+# the exact R version at run time.
+name: trend-r
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - r-base>=3.5
+  - r-tidyverse
+  - r-data.table
+  - bioconductor-rsamtools

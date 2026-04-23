@@ -1,0 +1,75 @@
+# =============================================================================
+# Files that exceed GitHub's 100 MB hard limit — fetched from Dropbox by
+# scripts/download_data.sh after `git clone`.
+# =============================================================================
+
+# The Lib4 reference library and full per-construct metadata
+codes/2. HPC_cluster_scripts/required_metadata/Lib4.fasta
+codes/2. HPC_cluster_scripts/required_metadata/Lib4_info_concise_060621.csv
+
+# The full per-barcode alignment count tables (Step 8 outputs from the
+# published runs). The bundled subsampled versions in dashboard/example_data/
+# are sufficient for Tier 1/2/3 verification.
+project_data/alignment_results/ovarian_cancer/alignment_result_*.csv
+project_data/alignment_results/T_cell_activation/alignment_result_*.csv
+
+# =============================================================================
+# Reference papers and supplementary tables (third-party copyrighted material).
+# We DO commit our own derived tables: Table_S1_Lambert_alias_mapping.csv and
+# Table_S2_DAlessio_tissue_system_mapping.csv (those are our work).
+# =============================================================================
+references/*.pdf
+references/*.docx
+references/Lambert Table S1.xlsx
+references/Reddy Table S6.xlsx
+references/D'Alessio Table S1.xlsx
+
+# =============================================================================
+# Superseded / legacy metadata snapshots
+# =============================================================================
+**/*_old.csv
+
+# =============================================================================
+# Generated runtime artifacts (rebuilt locally; never shipped)
+# =============================================================================
+dashboard/backend/state/*.sqlite
+dashboard/backend/state/*.json
+dashboard/runs/oracle_*/
+dashboard/runs/2*/
+
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg
+
+# =============================================================================
+# Frontend
+# =============================================================================
+dashboard/frontend/node_modules/
+dashboard/frontend/dist/
+dashboard/frontend/.vite/
+
+# =============================================================================
+# Editor / OS
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# =============================================================================
+# Local data downloads (the download script extracts here before placing files)
+# =============================================================================
+data_download/

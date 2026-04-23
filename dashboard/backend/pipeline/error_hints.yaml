@@ -1,0 +1,79 @@
+# FR-9 plain-language failure surfacing.
+#
+# When a step exits non-zero, the runner classifies the captured stderr against
+# these rules in order; the first match wins. Each rule produces a headline +
+# recommended next action that the dashboard renders inline (no log-grepping
+# required).
+
+schema_version: 1
+
+rules:
+  - id: tool_not_found
+    pattern: '(No such file or directory|command not found|cannot find|is not recognized)'
+    headline: "A required tool was not found on PATH."
+    action: |
+      The pipeline needs an external bioinformatics tool that isn't installed.
+      Open the Health page to see which tools are missing and how to install
+      them, or use the Docker container (`cd dashboard && docker compose up`)
+      which has everything pinned.
+
+  - id: cutadapt_no_adapter_match
+    pattern: 'cutadapt.*[Nn]o adapter|no reads passed|0 reads passed filtering'
+    headline: "Cutadapt found no reads matching the expected adapter pattern."
+    action: |
+      Step 6 expects flanking sequences TAAAGCGGCCGCGAGGATCC...CGCAGACTCGACCACCTCTGAC
+      around the 20-bp barcode. Confirm those constants match your construct
+      (visible in steps.yaml and on the Construct & Parameters page).
+
+  - id: bowtie2_index_missing
+    pattern: 'bowtie2.*could not open|index .* does not exist'
+    headline: "Bowtie2 could not open the Lib4 reference index."
+    action: |
+      Build the index first with:
+      `bowtie2-build codes/2.\\ HPC_cluster_scripts/required_metadata/Lib4.fasta lib4_index`
+      and pass the resulting prefix as `lib4_index_prefix` in the run parameters.
+
+  - id: r_package_missing
+    pattern: 'there is no package called'
+    headline: "An R package required by Step 8 or Step 9 is not installed."
+    action: |
+      The container ships these pinned. For native runs, install with:
+      `R -e 'install.packages(c("tidyverse","data.table","BiocManager"))'`
+      and `R -e 'BiocManager::install("Rsamtools")'`.
+
+  - id: r_setwd_failed
+    pattern: 'cannot change working directory'
+    headline: "R could not enter its expected working directory."
+    action: |
+      The Step 9 R scripts use setwd() to a hard-coded path. The dashboard wraps
+      them in a temp cwd to avoid this. If you see this from a CLI invocation,
+      run via the dashboard runner instead.
+
+  - id: rsamtools_sortbam
+    pattern: 'sortBam|asBam.*failed'
+    headline: "Step 8 SAM->BAM conversion failed."
+    action: |
+      Verify SAM files in the working directory are non-empty and well-formed.
+      Inspect with `samtools view <file.sam> | head` and re-run Step 7 if needed.
+
+  - id: out_of_memory
+    pattern: '[Oo]ut of memory|MemoryError|cannot allocate'
+    headline: "A step ran out of memory."
+    action: |
+      Step 8 (R + Rsamtools) and the Step 9 join can need 16-32 GB on full data.
+      Either run on a higher-memory machine, or use the bundled tiny example
+      dataset for development.
+
+  - id: permission_denied
+    pattern: 'Permission denied|EACCES'
+    headline: "A file or directory could not be accessed."
+    action: |
+      Check file permissions in the working directory. If running in Docker,
+      ensure the volume mount has read+write for the dashboard user.
+
+  - id: generic_nonzero
+    pattern: '.*'
+    headline: "Step exited with a non-zero status."
+    action: |
+      Open the manifest for this run to see the full stderr tail and exit code.
+      If the message looks unfamiliar, open an issue with the manifest attached.

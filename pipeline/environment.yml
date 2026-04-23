@@ -1,0 +1,55 @@
+# Conda environment for trend-pipeline development AND end-user installs.
+#
+# Single-shot setup on Linux / macOS / WSL2:
+#     conda env create -f environment.yml
+#     conda activate trend
+#     pip install -e ./pipeline   # editable install of the trend CLI
+#
+# After Bioconda submission, end users will instead run:
+#     conda install -c bioconda trend-pipeline
+# which pulls in everything below as transitive dependencies.
+
+name: trend
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+
+dependencies:
+  # Python runtime + workflow orchestrator
+  - python>=3.10
+  - pip
+  - pyyaml
+  - pandas
+  - numpy
+  - duckdb
+  - snakemake>=7.32
+
+  # Pipeline binaries (Steps 1-8). Versions match Lib4_all_steps_FINAL_111525.sbatch:62.
+  - bowtie2=2.3.4.3
+  - samtools
+  - cutadapt
+  - fastx_toolkit
+
+  # R + R packages (Steps 8 and 9). r-base 3.5.1 may not resolve on every channel
+  # — accepting any 3.5.x is also fine; the manifest records the exact version.
+  - r-base>=3.5
+  - r-tidyverse
+  - r-data.table
+  - bioconductor-rsamtools
+
+  # Python utilities used by Steps 1-3
+  - biopython
+  - openpyxl
+
+  # Dashboard (optional consumer; safe to include in dev env)
+  - fastapi
+  - uvicorn
+  - sse-starlette
+  - pydantic
+
+  # Frontend toolchain (only needed if rebuilding the dashboard SPA)
+  - nodejs>=20
+
+  - pip:
+      - sse-starlette  # ensure pip-side install if conda channel lags

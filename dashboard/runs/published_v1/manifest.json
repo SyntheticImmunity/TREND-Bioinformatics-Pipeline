@@ -1,0 +1,44 @@
+{
+  "run_id": "published_v1",
+  "project": "ovarian_cancer",
+  "created_at": "2026-04-23T00:00:00+00:00",
+  "finished_at": "2026-04-23T00:00:00+00:00",
+  "status": "completed",
+  "dashboard_version": "0.1.0",
+  "description": "Reference manifest for the published OvCa enhancer-activity figures. Output paths point into project_data/ (never duplicated). When a reviewer runs the FR-4 oracle on the same code+inputs, the comparator should report MATCH against these files.",
+  "software": {
+    "note": "Pipeline published with the SBATCH-pinned versions: R 3.5.1, bowtie2 2.3.4.3, samtools, cutadapt, fastx-toolkit. See Lib4_all_steps_FINAL_111525.sbatch:62 for the canonical version pins."
+  },
+  "parameters": {
+    "sample_names": [
+      "OV8_r1",
+      "OV8_r2",
+      "OV8_r3",
+      "IOSE_r1",
+      "IOSE_r2",
+      "IOSE_r3",
+      "ID8_r1",
+      "ID8_r2"
+    ],
+    "dna_threshold_vector": [
+      2,
+      3,
+      5,
+      6,
+      3,
+      2,
+      30,
+      35
+    ],
+    "bc_threshold": 3,
+    "note": "Source of truth for these parameters: ovarian_cancer_specific_enhancer_screening_analysis.R lines 59-67, 215."
+  },
+  "inputs": {
+    "project_data\\alignment_results\\ovarian_cancer\\alignment_result_normalized_in_house_pipeline.csv": "74bad8ee549da1effd611ebf0b2e038e139375a106bfd32430f6e3156fd0c800",
+    "project_data\\alignment_results\\ovarian_cancer\\alignment_result_unnormalized_in_house_pipeline.csv": "b02b4a85c14c87a04cf2af3d5d85de856a2f4fdea89bd16c25163dd260af0316"
+  },
+  "outputs": {
+    "project_data\\final_enhancer_activity_results\\ovarian_cancer\\ovca_sensor_activity_result_concise.csv": "e4c3fa3e3d5e113b885e8db3d800f7180edf1fe0cd8833652d0a6186c66b4289",
+    "project_data\\final_enhancer_activity_results\\ovarian_cancer\\ovca_sensor_activity_result_all.csv": "b2930f79f109dd2134d2f3ff92ac2ff840b4c68683e3a16bec0d27e29d17798c"
+  }
+}

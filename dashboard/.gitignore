@@ -1,0 +1,28 @@
+# Generated runtime state
+backend/state/*.sqlite
+backend/state/*.json
+runs/*/
+!runs/published_v1/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store

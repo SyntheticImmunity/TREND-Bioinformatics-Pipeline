@@ -1,0 +1,24 @@
+# TREND Dashboard - one-command local launch.
+# Reviewer flow: `cd dashboard && docker compose up` -> http://localhost:8000
+
+services:
+  dashboard:
+    build:
+      context: ..
+      dockerfile: dashboard/Dockerfile
+    image: trend-dashboard:0.1.0
+    container_name: trend-dashboard
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist ingested SQLite + run history across container restarts so that
+      # `docker compose up` after the first run is instant.
+      - dashboard-state:/app/dashboard/backend/state
+      - dashboard-runs:/app/dashboard/runs
+    environment:
+      - TREND_DASHBOARD_MODE=container
+    restart: unless-stopped
+
+volumes:
+  dashboard-state:
+  dashboard-runs:

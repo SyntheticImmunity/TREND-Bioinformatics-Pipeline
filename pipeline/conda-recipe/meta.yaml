@@ -1,0 +1,92 @@
+{% set name = "trend-pipeline" %}
+{% set version = "0.1.0" %}
+
+# Bioconda recipe for trend-pipeline.
+#
+# Submission workflow (one-time, by the maintainer):
+#   1. Fork bioconda-recipes
+#   2. Copy this directory to bioconda-recipes/recipes/trend-pipeline/
+#   3. `bioconda-utils build recipes/trend-pipeline` (runs in a clean container)
+#   4. Open a PR; reviewers approve; package becomes available via:
+#         conda install -c bioconda trend-pipeline
+#
+# After acceptance, every tagged GitHub release auto-builds via Bioconda CI.
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  # When submitting to bioconda, point this at a tagged GitHub release tarball
+  # (or a PyPI sdist). For local builds use `path:` to test before tagging.
+  path: ../
+
+build:
+  number: 0
+  noarch: python
+  script: "{{ PYTHON }} -m pip install --no-deps --ignore-installed ."
+  entry_points:
+    - trend = trend.cli:main
+
+requirements:
+  host:
+    - python >=3.10
+    - pip
+    - hatchling
+  run:
+    # Python runtime
+    - python >=3.10
+    - pyyaml >=6.0
+    - pandas >=2.1
+    - numpy >=1.26
+    - snakemake >=7.32
+
+    # Pipeline binaries (versions matched to manuscript SBATCH).
+    - bowtie2 ==2.3.4.3
+    - samtools
+    - cutadapt
+    - fastx_toolkit
+
+    # R + R packages
+    - r-base >=3.5
+    - r-tidyverse
+    - r-data.table
+    - bioconductor-rsamtools
+
+    # Python deps used by the bundled scripts
+    - biopython
+    - openpyxl
+
+test:
+  imports:
+    - trend
+  commands:
+    - trend --version
+    - trend --help
+    - trend preflight
+
+about:
+  home: https://github.com/<owner>/TREND_bioinformatics_pipeline
+  license: MIT
+  license_file: ../../LICENSE
+  summary: |
+    TREND - Transcription-Factor-Responsive Enhancer Discovery pipeline.
+    End-to-end MPRA-style barcode counting and enhancer-activity quantification
+    for the Lib4 designed library, runnable on a workstation or any HPC cluster.
+  description: |
+    The trend-pipeline package provides a single-command interface to the TREND
+    bioinformatics pipeline described in <citation>. It bundles bowtie2-based
+    barcode alignment, UMI collapsing, per-sample count tables, and per-project
+    enhancer-activity quantification as a Snakemake DAG, plus an interactive
+    web dashboard for exploring the library composition and result tables.
+
+    Typical use:
+        conda install -c bioconda trend-pipeline
+        trend run --example ovarian_cancer
+        trend dashboard
+  doc_url: https://github.com/<owner>/TREND_bioinformatics_pipeline#readme
+  dev_url: https://github.com/<owner>/TREND_bioinformatics_pipeline
+
+extra:
+  recipe-maintainers:
+    - <github-handle>

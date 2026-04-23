@@ -1,0 +1,39 @@
+Alias_in_source_motif_database,Lambert_canonical_symbol,Lambert_DBD_family,Lambert_TF_assessment,In_confirmed_set,Notes
+BMAL1,ARNTL,bHLH,Known motif,Yes,Canonical HGNC symbol is ARNTL; BMAL1 widely used in circadian literature
+BSH,BSX,Homeodomain,Known motif,Yes,Gene symbol synonym resolved via HGNC
+PEBB,CBFB,Unknown,Unlikely to be sequence specific TF,No,Gene symbol synonym resolved via HGNC
+CR3L1,CREB3L1,bZIP,Known motif,Yes,Gene symbol synonym resolved via HGNC
+CR3L2,CREB3L2,bZIP,Known motif,Yes,Gene symbol synonym resolved via HGNC
+COE1,EBF1,EBF1,Known motif,Yes,Gene symbol synonym resolved via HGNC
+C19orf40,FAAP24,Unknown,Unlikely to be sequence specific TF,No,Gene symbol synonym resolved via HGNC
+GABP1,GABPA,Ets,Known motif,Yes,GABP alpha subunit; canonical GABPA
+GLI,GLI1,C2H2 ZF,Known motif,Yes,Generic; canonical GLI1 (motif DB ambiguity resolved to most likely)
+TF2LX,GTF2IRD1,GTF2I-like,Known motif,Yes,Gene symbol synonym resolved via HGNC
+HMBX1,HMBOX1,Homeodomain,Known motif,Yes,Gene symbol synonym resolved via HGNC
+FEZ1,LZTS1,Unknown,Unlikely to be sequence specific TF,No,Gene symbol synonym resolved via HGNC
+EVI1,MECOM,C2H2 ZF,Known motif,Yes,Old symbol; HGNC canonical is MECOM
+MUSC,MSC,bHLH,Known motif,Yes,Gene symbol synonym resolved via HGNC
+NDF2,NEUROD2,bHLH,Known motif,Yes,Gene symbol synonym resolved via HGNC
+NGN2,NEUROG2,bHLH,Known motif,Yes,Neurogenin-2; canonical NEUROG2
+GCR,NR3C1,Nuclear receptor,Known motif,Yes,Glucocorticoid receptor; canonical NR3C1
+MCR,NR3C2,Nuclear receptor,Known motif,Yes,Mineralocorticoid receptor; canonical NR3C2
+SF1,NR5A1,Nuclear receptor,Known motif,Yes,Steroidogenic factor 1; canonical NR5A1
+PRGR,PGR,Nuclear receptor,Known motif,Yes,Progesterone receptor; canonical PGR
+PLAL1,PLAGL1,C2H2 ZF,Known motif,Yes,Gene symbol synonym resolved via HGNC
+PIT1,POU1F1,Homeodomain; POU,Known motif,Yes,Pituitary transcription factor 1; canonical POU1F1
+P5F1B,POU5F1B,Homeodomain; POU,Known motif,Yes,Gene symbol synonym resolved via HGNC
+PRD14,PRDM14,C2H2 ZF,Known motif,Yes,Gene symbol synonym resolved via HGNC
+RX,RAX,Homeodomain,Known motif,Yes,Retinal homeobox; canonical RAX
+SUH,RBPJL,CSL,Inferred motif,Yes,Gene symbol synonym resolved via HGNC
+TF65,RELA,Rel,Known motif,Yes,NF-kB p65 subunit; canonical RELA
+RHXF1,RHOXF1,Homeodomain,Known motif,Yes,Gene symbol synonym resolved via HGNC
+RORG,RORC,Nuclear receptor,Known motif,Yes,Gene symbol synonym resolved via HGNC
+SMRC1,SMARCC1,Myb/SANT,Unlikely to be sequence specific TF,No,Gene symbol synonym resolved via HGNC
+SREBP,SREBF1,bHLH,Known motif,Yes,Generic; canonical SREBF1
+BRAC,T,T-box,Known motif,Yes,Historical abbreviation for Brachyury (gene symbol T)
+HTF4,TCF12,bHLH,Known motif,Yes,Gene symbol synonym resolved via HGNC
+PRKRIR,THAP12,THAP finger,Known motif,Yes,Gene symbol synonym resolved via HGNC
+TWST1,TWIST1,bHLH,Known motif,Yes,Old abbreviation; canonical TWIST1
+UBIP1,UBP1,Grainyhead,Known motif,Yes,Gene symbol synonym resolved via HGNC
+UNC4,UNCX,Homeodomain,Known motif,Yes,Gene symbol synonym resolved via HGNC
+YBOX1,YBX1,CSD,Known motif,Yes,Gene symbol synonym resolved via HGNC

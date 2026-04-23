@@ -1,0 +1,38 @@
+# TREND sample sheet — ovarian cancer template.
+#
+# This file is the ONLY configuration the user needs to edit. The pipeline
+# reads it to discover sample IDs, their roles (DNA input vs RNA readout),
+# their replicate structure, and the per-sample DNA-abundance threshold
+# applied during the Step 9 enhancer-activity analysis.
+#
+# The values below mirror the published OvCa run for reference. Replace them
+# with your own sample IDs / FASTQ paths / thresholds.
+#
+# Source of the published numbers:
+#   sample names    — ovarian_cancer_specific_enhancer_screening_analysis.R:59-67
+#   thresholds      — same file, line 66
+#   bc_threshold    — same file, line 215
+
+project: ovarian_cancer
+
+samples:
+  # Cell line: OV8 (ovarian cancer)
+  - { id: OV8_r1,  fastq: fastqs/OV8_r1.fastq.gz,  role: RNA, condition: tumor,    cell_line: OV8,  replicate_group: 1, dna_threshold: 2 }
+  - { id: OV8_r2,  fastq: fastqs/OV8_r2.fastq.gz,  role: RNA, condition: tumor,    cell_line: OV8,  replicate_group: 2, dna_threshold: 3 }
+  - { id: OV8_r3,  fastq: fastqs/OV8_r3.fastq.gz,  role: RNA, condition: tumor,    cell_line: OV8,  replicate_group: 3, dna_threshold: 5 }
+
+  # Cell line: IOSE (immortalized normal ovarian surface epithelium - control)
+  - { id: IOSE_r1, fastq: fastqs/IOSE_r1.fastq.gz, role: RNA, condition: control,  cell_line: IOSE, replicate_group: 1, dna_threshold: 6 }
+  - { id: IOSE_r2, fastq: fastqs/IOSE_r2.fastq.gz, role: RNA, condition: control,  cell_line: IOSE, replicate_group: 2, dna_threshold: 3 }
+  - { id: IOSE_r3, fastq: fastqs/IOSE_r3.fastq.gz, role: RNA, condition: control,  cell_line: IOSE, replicate_group: 3, dna_threshold: 2 }
+
+  # Cell line: ID8 (mouse ovarian cancer)
+  - { id: ID8_r1,  fastq: fastqs/ID8_r1.fastq.gz,  role: RNA, condition: tumor,    cell_line: ID8,  replicate_group: 1, dna_threshold: 30 }
+  - { id: ID8_r2,  fastq: fastqs/ID8_r2.fastq.gz,  role: RNA, condition: tumor,    cell_line: ID8,  replicate_group: 2, dna_threshold: 35 }
+
+# Per-promoter analysis parameters (defaults match the published OvCa Step 9 run).
+analysis:
+  bc_threshold: 3      # minimum supporting barcodes per promoter
+  contrasts:
+    - { name: OV8_vs_IOSE, tumor: OV8, control: IOSE }
+    - { name: ID8_vs_IOSE, tumor: ID8, control: IOSE }

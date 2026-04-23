@@ -1,0 +1,22 @@
+# Static project metadata for the ovarian cancer TREND analysis.
+#
+# This file describes the pipeline's expected output shape so the dashboard
+# can render result tables with appropriate column tooltips. It does not need
+# to change between runs — only samplesheet.yaml does.
+
+name: ovarian_cancer
+display_name: Ovarian cancer enhancer screening
+description: |
+  Promoter-level enhancer activity in ovarian cancer cell lines (OV8, ID8) vs.
+  normal ovarian surface epithelium control (IOSE). Tumor selectivity ratios
+  identify enhancers preferentially active in malignant cells.
+
+step9_script: codes/3. Post_HPC_enhancer_activity_analysis_scripts/code_by_projects/ovarian_cancer/ovarian_cancer_specific_enhancer_screening_analysis.R
+
+outputs:
+  - filename: ovca_sensor_activity_result_concise.csv
+    description: Promoter-level activity sorted by tumor selectivity (mean_OV8_to_IOSE_RD_ratio).
+  - filename: ovca_sensor_activity_result_all.csv
+    description: Full annotated activity table with per-replicate medians.
+  - filename: DNA_threshold_for_samples.pdf
+    description: Diagnostic plots used to choose per-sample DNA cutoffs.

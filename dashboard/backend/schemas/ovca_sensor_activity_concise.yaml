@@ -1,0 +1,48 @@
+# Column definitions for ovca_sensor_activity_result_concise.csv
+# Sourced from ovarian_cancer_specific_enhancer_screening_analysis.R lines 295-308.
+
+filename: ovca_sensor_activity_result_concise.csv
+description: |
+  Promoter-level enhancer activity for the ovarian cancer project. One row per
+  designed promoter, sorted by mean_OV8_to_IOSE_RD_ratio (tumor-vs-control selectivity).
+
+columns:
+  - name: promoter_name
+    type: string
+    description: Promoter identifier (TFBS variant + TF name).
+  - name: TFBS_sequence
+    type: string
+    description: 6-bp TFBS motif sequence variant for this promoter.
+  - name: TF_name_by_PPM
+    type: string
+    description: TF name as it appears in the PPM source database.
+  - name: TF_name_human_curated
+    type: string
+    description: Human-curated TF name; preferred for plotting and grouping.
+  - name: variable_region
+    type: string
+    description: Variable-region sequence used in this promoter design.
+  - name: by_ppm_name
+    type: string
+    description: PPM identifier (TF + species + database + version).
+  - name: rank
+    type: integer
+    description: Rank of this PPM among multiple PPMs for the same TF.
+  - name: NA_count
+    type: integer
+    description: Number of cell-line replicates without a usable RD ratio for this promoter.
+  - name: mean_OV8_RD_ratio
+    type: float
+    description: Mean RNA/DNA activity ratio across OV8 (ovarian cancer) replicates.
+  - name: mean_IOSE_RD_ratio
+    type: float
+    description: Mean RNA/DNA activity ratio across IOSE (immortalized normal control) replicates.
+  - name: mean_ID8_RD_ratio
+    type: float
+    description: Mean RNA/DNA activity ratio across ID8 (mouse ovarian cancer) replicates.
+  - name: mean_OV8_to_IOSE_RD_ratio
+    type: float
+    description: Tumor-vs-control selectivity for OV8 vs IOSE. Higher = more tumor-selective.
+  - name: mean_ID8_to_IOSE_RD_ratio
+    type: float
+    description: Tumor-vs-control selectivity for ID8 vs IOSE.

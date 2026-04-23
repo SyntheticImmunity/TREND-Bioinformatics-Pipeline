@@ -1,0 +1,36 @@
+# Snakemake SLURM profile for HPC cluster execution.
+# Usage: snakemake --profile path/to/this/dir
+#
+# Per-rule resource overrides go under set-resources/. The defaults below match
+# the resource requests in Lib4_all_steps_FINAL_111525.sbatch.
+
+executor: slurm
+jobs: 50                           # max simultaneous cluster jobs
+restart-times: 2                   # auto-retry transient failures
+keep-going: true                   # don't bail on first failure
+rerun-incomplete: true
+use-conda: true                    # each rule runs in its envs/*.yaml conda env
+conda-frontend: mamba              # faster than conda; falls back to conda if absent
+
+default-resources:
+  - slurm_partition=short
+  - mem_mb=8000
+  - runtime=120                    # minutes
+  - cpus_per_task=2
+
+set-resources:
+  align:
+    slurm_partition: short
+    mem_mb: 16000
+    runtime: 240
+    cpus_per_task: 8
+  count_tables:
+    slurm_partition: short
+    mem_mb: 32000
+    runtime: 240
+    cpus_per_task: 4
+  enhancer_activity:
+    slurm_partition: short
+    mem_mb: 16000
+    runtime: 120
+    cpus_per_task: 2

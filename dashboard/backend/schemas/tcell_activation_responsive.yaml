@@ -1,0 +1,46 @@
+# Column definitions for activation_responsive_enhancer_screening_result_donor*.csv
+# Sourced from T_cell_activation_responsive_enhancer_screening_analysis.R.
+
+filename: activation_responsive_enhancer_screening_result_donor*.csv
+description: |
+  Per-donor promoter-level activity for the T-cell activation project. One row
+  per designed promoter, with rest- and stim-condition activity ratios and the
+  stim/rest fold change.
+
+columns:
+  - name: promoter_name
+    type: string
+    description: Promoter identifier (TFBS variant + TF name).
+  - name: TFBS_sequence
+    type: string
+    description: 6-bp TFBS motif sequence variant for this promoter.
+  - name: TF_name_by_PPM
+    type: string
+    description: TF name as it appears in the PPM source database.
+  - name: TF_name_human_curated
+    type: string
+    description: Human-curated TF name; preferred for plotting and grouping.
+  - name: variable_region
+    type: string
+    description: Variable-region sequence used in this promoter design.
+  - name: by_ppm_name
+    type: string
+    description: PPM identifier (TF + species + database + version).
+  - name: rank
+    type: integer
+    description: Rank of this PPM among multiple PPMs for the same TF.
+  - name: median_rest_Lib4_RD_ratio_r1
+    type: float
+    description: Median RNA/DNA activity ratio across barcodes in resting CD4 cells (replicate 1).
+  - name: median_stim_Lib4_RD_ratio_r1
+    type: float
+    description: Median RNA/DNA activity ratio across barcodes in stimulated CD4 cells (replicate 1).
+  - name: rest_r1_n_bc
+    type: integer
+    description: Number of supporting barcodes contributing to the rest-condition median.
+  - name: stim_r1_n_bc
+    type: integer
+    description: Number of supporting barcodes contributing to the stim-condition median.
+  - name: stim_to_rest_RD_ratio_r1
+    type: float
+    description: Activation-induced fold change (stim / rest) per promoter.

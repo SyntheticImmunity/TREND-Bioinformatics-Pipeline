@@ -1,0 +1,131 @@
+# Declarative 9-step TREND pipeline contracts.
+#
+# This file is metadata about the existing scripts; it does NOT modify them.
+# Each step's `command_template` is a list of shell tokens that the runner
+# substitutes against the per-run context (`work_dir`, sample names, etc.).
+# Tokens like {work_dir} are filled by runner.cwd_shim.materialize().
+#
+# Sources:
+#   - codes/2. HPC_cluster_scripts/Lib4_all_steps_FINAL_111525.sbatch (lines 99-159)
+#   - codes/3. .../detailed_description_of_the code's_functionality/*.md
+#
+# Tools required (verified by FR-2 preflight): bowtie2, samtools, fastx_collapser,
+# cutadapt, R + tidyverse + Rsamtools, Python + biopython + pandas + numpy.
+
+schema_version: 1
+
+steps:
+  - id: step_1_verify_barcodes
+    name: Verify sample-barcode consistency
+    short_purpose: Confirm each demultiplexed FASTQ matches its expected sample.
+    tool: python
+    optional: true
+    inputs: [demuxed_fastqs, barcode_key_xlsx]
+    outputs: [barcode_consistency_report.csv]
+    command_template:
+      - python
+      - "{codes_root}/2. HPC_cluster_scripts/requred_codes/check_sample_barcode_consistency_v3.py"
+
+  - id: step_2_flip_orientation
+    name: Correct read orientation
+    short_purpose: Identify reverse-complement reads and flip them to the canonical orientation.
+    tool: python
+    inputs: [raw_fastq]
+    outputs: [flipped_fastq]
+    command_template:
+      - python
+      - "{codes_root}/2. HPC_cluster_scripts/requred_codes/correct_read_orientation_for_Lib4_mbcf.py"
+      - "{input_fastq}"
+
+  - id: step_3_demultiplex
+    name: Demultiplex pooled reads
+    short_purpose: Split a pooled FASTQ into per-sample FASTQs using the barcode key.
+    tool: python
+    optional: true
+    inputs: [pooled_fastq, barcode_key_xlsx]
+    outputs: [per_sample_fastqs]
+    command_template:
+      - python
+      - "{codes_root}/2. HPC_cluster_scripts/requred_codes/demultiplex_fastq_for_Lib4_FINAL.py"
+      - "{pooled_fastq}"
+      - "{barcode_key_xlsx}"
+
+  - id: step_4_trim_adapters
+    name: Trim sequencing adapters
+    short_purpose: Remove residual Illumina adapter sequence from the 3' end of each read.
+    tool: fastx-toolkit
+    inputs: [demuxed_fastq]
+    outputs: [trimmed_fastq]
+    command_template:
+      - fastx_trimmer
+      - -t
+      - "17"
+      - -i
+      - "{input_fastq}"
+      - -o
+      - "{trimmed_fastq}"
+      - -Q33
+
+  - id: step_5_collapse_umis
+    name: Collapse PCR duplicates by UMI
+    short_purpose: One representative read per UMI; outputs FASTA.
+    tool: fastx-toolkit
+    inputs: [trimmed_fastq]
+    outputs: [collapsed_fasta]
+    command_template:
+      - fastx_collapser
+      - -i
+      - "{trimmed_fastq}"
+      - -o
+      - "{collapsed_fasta}"
+      - -Q33
+
+  - id: step_6_extract_barcodes
+    name: Extract the 20-bp designed barcode
+    short_purpose: Cutadapt strips constant flanks; reads without the expected motif are discarded.
+    tool: cutadapt
+    inputs: [collapsed_fasta]
+    outputs: [barcode_fasta]
+    command_template:
+      - cutadapt
+      - -g
+      - "TAAAGCGGCCGCGAGGATCC...CGCAGACTCGACCACCTCTGAC"
+      - -o
+      - "{barcode_fasta}"
+      - "{collapsed_fasta}"
+
+  - id: step_7_align_barcodes
+    name: Align barcodes to the Lib4 reference
+    short_purpose: Bowtie2 with parameters optimized for short, high-similarity sequences.
+    tool: bowtie2
+    inputs: [barcode_fasta, lib4_index]
+    outputs: [sam_file]
+    command_template:
+      - bowtie2
+      - -x
+      - "{lib4_index_prefix}"
+      - -U
+      - "{barcode_fasta}"
+      - -S
+      - "{sam_file}"
+      - --no-1mm-upfront
+
+  - id: step_8_count_barcodes
+    name: Generate barcode count tables
+    short_purpose: Convert SAM->BAM, count reads per barcode, compile raw + RPM matrices.
+    tool: R
+    inputs: [sam_files, lib4_info_csv]
+    outputs: [alignment_result_unnormalized_in_house_pipeline.csv, alignment_result_normalized_in_house_pipeline.csv]
+    command_template:
+      - Rscript
+      - "{codes_root}/2. HPC_cluster_scripts/requred_codes/extract_counts_from_samfiles_Lib4.R"
+
+  - id: step_9_enhancer_activity
+    name: Enhancer-activity quantification (per project)
+    short_purpose: Apply DNA thresholds, collapse barcode RD ratios to promoter scores, output annotated activity tables.
+    tool: R
+    inputs: [alignment_result_normalized_in_house_pipeline.csv, alignment_result_unnormalized_in_house_pipeline.csv, all_enhancer_metadata_111525.csv]
+    outputs: [project_specific_activity_csvs]
+    command_template:
+      - Rscript
+      - "{step9_script}"

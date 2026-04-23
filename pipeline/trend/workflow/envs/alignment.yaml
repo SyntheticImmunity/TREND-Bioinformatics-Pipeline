@@ -1,0 +1,11 @@
+# Alignment + read-processing tools for Steps 4-7.
+# Versions matched to the manuscript SBATCH (Lib4_all_steps_FINAL_111525.sbatch:62).
+name: trend-alignment
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - bowtie2=2.3.4.3
+  - samtools
+  - cutadapt
+  - fastx_toolkit

@@ -1,0 +1,234 @@
+tissue,system
+adipose tissue,Adipose
+adipose tissue omental,Adipose
+adipose tissue subcutaneous,Adipose
+Huvec cells,Cardiovascular
+aorta,Cardiovascular
+aortic smooth muscle,Cardiovascular
+artery endothelial cell,Cardiovascular
+coronary artery,Cardiovascular
+coronary smooth muscle cell,Cardiovascular
+heart,Cardiovascular
+heart atrium,Cardiovascular
+heart ventricle,Cardiovascular
+lymphatic vessel endothelial cell,Cardiovascular
+microvascular endothelial cell,Cardiovascular
+pericardium,Cardiovascular
+saphenous vein,Cardiovascular
+vein endothelial cell,Cardiovascular
+vena cava,Cardiovascular
+adipocyte mesenchymal stem cell,Embryonic/Stem cells
+amniocyte,Embryonic/Stem cells
+conjuctiva side population stem cell,Embryonic/Stem cells
+definitive neural epithelial cell,Embryonic/Stem cells
+differentiated hepatocyte,Embryonic/Stem cells
+differentiated mesenchymal stem cell,Embryonic/Stem cells
+differentiated myofibroblast,Embryonic/Stem cells
+embryoid body differentiation 1,Embryonic/Stem cells
+embryoid body differentiation 2,Embryonic/Stem cells
+embryoid body differentiation 3,Embryonic/Stem cells
+embryonic stem cells,Embryonic/Stem cells
+fetal brain,Embryonic/Stem cells
+fetal fibroblast,Embryonic/Stem cells
+fetal liver,Embryonic/Stem cells
+fetal mesenchymal stem cell,Embryonic/Stem cells
+germ line stem cell,Embryonic/Stem cells
+hematopoietic stem cell,Embryonic/Stem cells
+in vitro differentiated fibroblast,Embryonic/Stem cells
+in vitro differentiated neuronal progenitor,Embryonic/Stem cells
+induced pluripotent cell,Embryonic/Stem cells
+lipoma mesenchymal stem cell,Embryonic/Stem cells
+mesenchymal stem cell,Embryonic/Stem cells
+msc to chondrocyte differentiation day 1,Embryonic/Stem cells
+msc to chondrocyte differentiation day 21,Embryonic/Stem cells
+msc to chondrocyte differentiation day 3,Embryonic/Stem cells
+msc to chondrocyte differentiation day 7,Embryonic/Stem cells
+msc to osteoblast differentiation day 1,Embryonic/Stem cells
+msc to osteoblast differentiation day 21,Embryonic/Stem cells
+msc to osteoblast differentiation day 3,Embryonic/Stem cells
+msc to osteoblast differentiation day 7,Embryonic/Stem cells
+neural precursors cells,Embryonic/Stem cells
+neuronal progenitor,Embryonic/Stem cells
+primary neural epithelial cell,Embryonic/Stem cells
+white adipocyte 21 d differentiated from MSC,Embryonic/Stem cells
+pituitary gland,Endocrine
+thyroid gland,Endocrine
+breast,Female reproduction
+cervix,Female reproduction
+cultured breast epithelial cell,Female reproduction
+cumulus cell,Female reproduction
+ductal breast epithelial cell,Female reproduction
+endometrium,Female reproduction
+fallopian tube,Female reproduction
+fallopian tube epithelial cell,Female reproduction
+immortalized breast epithelial cell,Female reproduction
+immortalized ovary epithelial cell,Female reproduction
+mammary gland,Female reproduction
+myometrium,Female reproduction
+nipple cross section,Female reproduction
+oocyte pooled cells,Female reproduction
+oocyte single cells,Female reproduction
+ovary,Female reproduction
+ovary epithelial cell,Female reproduction
+placenta,Female reproduction
+single.fate epithelial stem cell from mammosphere,Female reproduction
+uterus,Female reproduction
+vagina,Female reproduction
+vulva,Female reproduction
+colon,Gastrointestinal
+colon cecum,Gastrointestinal
+colon epithelial cell,Gastrointestinal
+colon fibroblast,Gastrointestinal
+esophagus,Gastrointestinal
+esophagus epithelial cell,Gastrointestinal
+hepatic stellate cell Ito cell,Gastrointestinal
+hepatocyte,Gastrointestinal
+ileum epithelial cell,Gastrointestinal
+liver,Gastrointestinal
+pancreas,Gastrointestinal
+peritneum,Gastrointestinal
+small intestine,Gastrointestinal
+small intestine duodenum,Gastrointestinal
+small intestine jejunum,Gastrointestinal
+stomach,Gastrointestinal
+stomach cardiac,Gastrointestinal
+stomach fundus,Gastrointestinal
+stomach pyloric,Gastrointestinal
+CD11. bone.marrow myeloid progenitor,Immune/Hematopoietic
+M1 macrophage,Immune/Hematopoietic
+M2 macrophage,Immune/Hematopoietic
+activated B cell,Immune/Hematopoietic
+activated CD4. T cell,Immune/Hematopoietic
+activated CD8. T cell,Immune/Hematopoietic
+activated M2 macrophage,Immune/Hematopoietic
+activated myeloid dendritic cell,Immune/Hematopoietic
+activated plasmacytoid dendritic cell,Immune/Hematopoietic
+alveolar macrophage,Immune/Hematopoietic
+alveolar macrophage from smoker,Immune/Hematopoietic
+bone marrow,Immune/Hematopoietic
+cd16 positive monocyte,Immune/Hematopoietic
+central memory CD4. T cell,Immune/Hematopoietic
+effector memory CD4. T cell,Immune/Hematopoietic
+erythroblast,Immune/Hematopoietic
+erythrocyte,Immune/Hematopoietic
+erythroid progenitor,Immune/Hematopoietic
+germinal centre centroblast,Immune/Hematopoietic
+germinal centre centrocyte,Immune/Hematopoietic
+lymph nodes,Immune/Hematopoietic
+memory B cell,Immune/Hematopoietic
+monocyte,Immune/Hematopoietic
+monocyte starting M1 macrophage differentiation,Immune/Hematopoietic
+monocyte starting dendritic differentiation,Immune/Hematopoietic
+myeloid dendritic cell,Immune/Hematopoietic
+naive B cell,Immune/Hematopoietic
+naive CD4. T cell,Immune/Hematopoietic
+naive CD8. T cell,Immune/Hematopoietic
+natural killer T cell,Immune/Hematopoietic
+natural killer cell,Immune/Hematopoietic
+neutrophil,Immune/Hematopoietic
+plasma B cell,Immune/Hematopoietic
+platelet,Immune/Hematopoietic
+promyelocyte CD9. CD14. CD15high CD16low bone marrow derived,Immune/Hematopoietic
+regulatory T cell,Immune/Hematopoietic
+retrocervical infiltrate,Immune/Hematopoietic
+spleen,Immune/Hematopoietic
+thymus gland,Immune/Hematopoietic
+trophoblast cell,Immune/Hematopoietic
+foot fibroblast,Integumentary
+foreskin epithelial cell,Integumentary
+foreskin fibroblast,Integumentary
+immortalized skin epithelial cell,Integumentary
+melanocyte,Integumentary
+skin,Integumentary
+skin cultured fibroblast,Integumentary
+skin epithelial cell keratinocyte,Integumentary
+skin primary fibroblast,Integumentary
+penis,Male reproduction
+prostate epithelial cell,Male reproduction
+prostate gland,Male reproduction
+prostate stromal cell CD49.,Male reproduction
+spermatogonial,Male reproduction
+spermatozoal,Male reproduction
+testes,Male reproduction
+Schwann cell,Nervous system
+accumbens,Nervous system
+adrenal gland cortex,Nervous system
+amygdala,Nervous system
+astrocyte,Nervous system
+caudate,Nervous system
+cerebellar hemisphere,Nervous system
+cerebellar vermis,Nervous system
+cerebellum,Nervous system
+cerebral cortex,Nervous system
+corpus callosum,Nervous system
+dorsal root ganglia,Nervous system
+frontal cortex,Nervous system
+frontal lobe,Nervous system
+globus pallidus,Nervous system
+gloubus pallidum external,Nervous system
+gloubus pallidum internal,Nervous system
+hippocampus,Nervous system
+hypothalamus,Nervous system
+kidney cortex,Nervous system
+medulla,Nervous system
+midbrain,Nervous system
+nodose nucleus,Nervous system
+occipital lobe,Nervous system
+parietal lobe,Nervous system
+pons,Nervous system
+prefrontal cortex,Nervous system
+putamen,Nervous system
+pyramidal neuron from entorhinal cortex,Nervous system
+pyramidal neuron from hippocampus,Nervous system
+pyramidal neuron from midtemporal gyrus,Nervous system
+pyramidal neuron from posterior singulate organ,Nervous system
+pyramidal neuron from superior frontal gyrus,Nervous system
+spinal cord,Nervous system
+stellate neuron from entorhinal cortex,Nervous system
+substantia nigra,Nervous system
+substantia nigra pars compacta,Nervous system
+substantia nigra reticulata,Nervous system
+subthalamic nucleus,Nervous system
+temporal lobe,Nervous system
+thalamus,Nervous system
+thalamus lateral nuclei,Nervous system
+thalamus subthalamic nucleus,Nervous system
+trigeminal ganglia,Nervous system
+ventral tegmental area,Nervous system
+vestibular nuclei superior,Nervous system
+immortalized gingival epithelial cell,Oral cavity
+odontoblast,Oral cavity
+oral epithelial cell,Oral cavity
+oral mucosa,Oral cavity
+primary gingival epithelial cell,Oral cavity
+salivary gland,Oral cavity
+tongue,Oral cavity
+tongue main corpus,Oral cavity
+tongue superior part papillae,Oral cavity
+tonsil,Oral cavity
+bronchus,Respiratory
+cultured airway epithelial cell,Respiratory
+immortalized airway epithelial cell,Respiratory
+large airway epithelial cell,Respiratory
+lung,Respiratory
+lung cultured fibroblast,Respiratory
+lung primary fibroblast,Respiratory
+nasal epithelial cell,Respiratory
+pharyngeal mucosa,Respiratory
+pharynx epithelial cell,Respiratory
+pulmonary smooth muscle,Respiratory
+small airway epithelial cell,Respiratory
+trachea,Respiratory
+trachea epithelial cell,Respiratory
+conjunctiva epithelial cell,Sensory
+chondrocyte,Skeletal/Muscle
+deltoid muscle,Skeletal/Muscle
+joint tissue synovium,Skeletal/Muscle
+osteoblast,Skeletal/Muscle
+skeletal muscle,Skeletal/Muscle
+skeletal muscle superior quadracep,Skeletal/Muscle
+synovial membrane,Skeletal/Muscle
+kidney,Urogenital
+kidney medulla,Urogenital
+urethra,Urogenital
+urothelial cell,Urogenital

@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "trend-pipeline"
+version = "0.1.0"
+description = "TREND enhancer-screening pipeline — installable end-to-end on Linux workstations and HPC clusters."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "TREND platform team" }]
+keywords = ["bioinformatics", "MPRA", "enhancer", "TFBS", "snakemake"]
+
+# Pure-Python runtime requirements. The bioinformatics binaries (bowtie2,
+# samtools, cutadapt, fastx_toolkit) and R + R packages are installed via
+# conda (see environment.yml / conda-recipe/meta.yaml) — pip alone cannot
+# bring them down on every platform.
+dependencies = [
+    "pyyaml>=6.0",
+    "pandas>=2.1",
+    "numpy>=1.26",
+    # snakemake is provided via conda (environment.yml / Bioconda recipe) —
+    # it has C extension transitive deps that don't always build cleanly on
+    # newer Pythons via pip. The CLI shells out to `snakemake` on PATH.
+]
+
+[project.optional-dependencies]
+dashboard = [
+    # Activate the FastAPI dashboard alongside the CLI.
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "duckdb>=1.0",
+    "sse-starlette>=2.1",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+# Single CLI entry point with subcommands. After `pip install trend-pipeline`,
+# users get `trend init`, `trend run`, `trend dashboard`, `trend status`.
+trend = "trend.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["trend"]
+# Include the bundled Snakemake workflow and project templates inside the wheel
+# so `pip install trend-pipeline` ships a complete, runnable artifact.
+include = [
+    "trend/workflow/**",
+    "trend/templates/**",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "trend/**",
+    "templates/**",
+    "conda-recipe/**",
+    "environment.yml",
+    "README.md",
+]

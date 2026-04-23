@@ -1,0 +1,48 @@
+# Column definitions for alignment_result_normalized_in_house_pipeline.csv (Step 8 output).
+# Sourced from extract_counts_from_samfiles_Lib4.R + the OvCa column inventory.
+
+filename: alignment_result_normalized_in_house_pipeline.csv
+description: |
+  Per-barcode RPM-normalized read counts across all sequenced samples. The
+  "shared" first 7 columns identify the construct; all subsequent columns
+  are per-sample counts named <CellLine>_Lib4_<Role>_<Replicate> where Role is
+  DNA (input library) or RNA (cell-line readout).
+
+columns:
+  - name: promoter_name_bc
+    type: string
+    description: Construct identifier (TFBS_TF_barcode); unique per row.
+  - name: promoter_name
+    type: string
+    description: Promoter identifier (TFBS variant + TF).
+  - name: TFBS_random_bc
+    type: string
+    description: TFBS variant + random 20-bp barcode.
+  - name: TFBS
+    type: string
+    description: 6-bp TFBS motif sequence variant.
+  - name: TF
+    type: string
+    description: Transcription factor symbol (raw library label).
+  - name: by_ppm_name
+    type: string
+    description: PPM identifier (TF + species + database + version).
+  - name: rank
+    type: integer
+    description: Rank of this PPM among multiple PPMs for the same TF.
+
+  # The remaining columns are sample-specific counts. Their names are derived
+  # at run time from the project's sample sheet and follow the pattern
+  # <CellLine>_Lib4_<Role>_<Replicate>. We document the role conventions here
+  # so the FR-8 tooltip can explain the pattern to users.
+
+dynamic_column_pattern:
+  format: "<CellLine>_Lib4_<Role>_<Replicate>"
+  role_meanings:
+    DNA: Input plasmid library counts (denominator of the RD ratio).
+    RNA: Cell-line readout counts (numerator of the RD ratio).
+  example_for_ovca:
+    cell_lines: [OV8, IOSE, ID8]
+    roles: [DNA, RNA]
+    replicate_suffixes: [r1, r2, r3]
+    sample_count: 16  # OV8: 3 DNA + 3 RNA; IOSE: 3 DNA + 3 RNA; ID8: 2 DNA + 2 RNA

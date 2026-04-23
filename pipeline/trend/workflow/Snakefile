@@ -1,0 +1,267 @@
+# TREND end-to-end workflow.
+#
+# Runs the manuscript's existing 9-step pipeline as a single Snakemake DAG. Same
+# scripts, same parameters, same outputs - just orchestrated by Snakemake so a
+# user can:
+#
+#     snakemake --cores 8                                    # local laptop
+#     snakemake --profile profiles/slurm                     # HPC cluster
+#     snakemake --use-conda --conda-prefix .snakemake/conda  # isolated tools
+#
+# Inputs (configurable via --config):
+#     inputs_dir          path to a directory of demultiplexed FASTQs
+#     project             ovarian_cancer | T_cell_activation
+#     codes_root          path to the manuscript's codes/ tree (auto-detected)
+#     metadata_root       path to required_metadata/ (auto-detected)
+#     samples             list of sample IDs (or auto-discovered from inputs_dir)
+#
+# All outputs land under the Snakemake working directory (passed via --directory).
+# The final results live in outputs/ and a manifest.json sidecar identifies the run.
+#
+# IMPORTANT: this Snakefile does NOT modify the existing scripts. Each rule shells
+# out to the published script with the cwd-shim pattern from cwd_shim.py.
+
+import os
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+# Auto-detect the repo layout. The Snakefile lives at
+# pipeline/trend/workflow/Snakefile, so the repo root is three parents up.
+REPO_ROOT = Path(workflow.basedir).resolve().parents[2]
+
+CODES_ROOT     = Path(config.get("codes_root", REPO_ROOT / "codes"))
+METADATA_ROOT  = Path(config.get(
+    "metadata_root", CODES_ROOT / "2. HPC_cluster_scripts" / "required_metadata",
+))
+STEP9_METADATA = Path(config.get(
+    "step9_metadata_root",
+    CODES_ROOT / "3. Post_HPC_enhancer_activity_analysis_scripts" / "required_metadata",
+))
+PYSCRIPTS = CODES_ROOT / "2. HPC_cluster_scripts" / "requred_codes"   # typo intentional
+RSCRIPTS  = CODES_ROOT / "3. Post_HPC_enhancer_activity_analysis_scripts" / "code_by_projects"
+
+INPUTS_DIR = Path(config.get("inputs_dir", "inputs"))
+PROJECT    = config.get("project", "ovarian_cancer")
+
+LIB4_FASTA = METADATA_ROOT / "Lib4.fasta"
+LIB4_INFO  = METADATA_ROOT / "Lib4_info_concise_060621.csv"
+ENH_META   = STEP9_METADATA / "all_enhancer_metadata_111525.csv"
+
+# Sample discovery: if the user passed an explicit list, use it; otherwise scan
+# inputs_dir for *.fastq / *.fastq.gz and strip the suffix.
+SAMPLES = config.get("samples")
+if SAMPLES is None:
+    if INPUTS_DIR.exists():
+        SAMPLES = sorted({
+            p.name.removesuffix(".gz").removesuffix(".fastq")
+            for p in INPUTS_DIR.iterdir()
+            if p.suffix in (".fastq", ".gz") or p.name.endswith(".fastq.gz")
+        })
+    else:
+        SAMPLES = []
+SAMPLES = list(SAMPLES)
+
+# Per-project Step-9 R script.
+STEP9_SCRIPTS = {
+    "ovarian_cancer":     RSCRIPTS / "ovarian_cancer" / "ovarian_cancer_specific_enhancer_screening_analysis.R",
+    "T_cell_activation":  RSCRIPTS / "T_cell_activation" / "T_cell_activation_responsive_enhancer_screening_analysis.R",
+}
+STEP9_OUTPUTS = {
+    "ovarian_cancer": [
+        "outputs/ovca_sensor_activity_result_concise.csv",
+        "outputs/ovca_sensor_activity_result_all.csv",
+    ],
+    "T_cell_activation": [
+        "outputs/activation_responsive_enhancer_screening_result_donor1.csv",
+        "outputs/activation_responsive_enhancer_screening_result_donor2.csv",
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# Phony targets
+# ---------------------------------------------------------------------------
+
+rule all:
+    """Default target: produce the project-specific Step-9 outputs."""
+    input:
+        STEP9_OUTPUTS.get(PROJECT, []),
+
+# ---------------------------------------------------------------------------
+# Step 7 prereq: build bowtie2 index from Lib4.fasta
+# ---------------------------------------------------------------------------
+
+rule bowtie2_index:
+    """Build the bowtie2 index from Lib4.fasta (one-time per Lib4 version)."""
+    input:
+        fasta = LIB4_FASTA,
+    output:
+        multiext("lib4_index", ".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2",
+                 ".rev.1.bt2", ".rev.2.bt2"),
+    log: "logs/bowtie2_index.log"
+    conda: "envs/alignment.yaml"
+    shell:
+        "bowtie2-build {input.fasta} lib4_index > {log} 2>&1"
+
+# ---------------------------------------------------------------------------
+# Step 2: orientation flip (per sample)
+# ---------------------------------------------------------------------------
+
+rule flip_orientation:
+    """Step 2: identify reverse-complement reads and flip them to canonical
+    orientation. Wraps correct_read_orientation_for_Lib4_mbcf.py UNCHANGED."""
+    input:
+        fastq = lambda wc: _input_fastq_for(wc.sample),
+    output:
+        flipped = "intermediate/flipped_{sample}.fastq",
+    log: "logs/flip_{sample}.log"
+    conda: "envs/python.yaml"
+    shell:
+        # The script takes the input FASTQ as argv[1] and writes flipped_<input>
+        # into its working directory. We run in intermediate/ so the output
+        # lands where the rest of the pipeline expects.
+        """
+        cp {input.fastq} intermediate/{wildcards.sample}.fastq
+        cd intermediate && python "{PYSCRIPTS}/correct_read_orientation_for_Lib4_mbcf.py" {wildcards.sample}.fastq > ../{log} 2>&1
+        rm -f intermediate/{wildcards.sample}.fastq
+        """
+
+# ---------------------------------------------------------------------------
+# Step 4: trim adapters (per sample) - fastx_trimmer
+# ---------------------------------------------------------------------------
+
+rule trim_adapter:
+    """Step 4: 3' adapter trim with fastx_trimmer -t 17."""
+    input:
+        flipped = "intermediate/flipped_{sample}.fastq",
+    output:
+        trimmed = "intermediate/trimmed_{sample}.fastq",
+    log: "logs/trim_{sample}.log"
+    conda: "envs/alignment.yaml"
+    shell:
+        "fastx_trimmer -t 17 -i {input.flipped} -o {output.trimmed} -Q33 2> {log}"
+
+# ---------------------------------------------------------------------------
+# Step 5: collapse PCR duplicates by UMI - fastx_collapser
+# ---------------------------------------------------------------------------
+
+rule collapse_umi:
+    """Step 5: one representative read per UMI; output is FASTA."""
+    input:
+        trimmed = "intermediate/trimmed_{sample}.fastq",
+    output:
+        collapsed = "intermediate/collapsed_{sample}.fasta",
+    log: "logs/collapse_{sample}.log"
+    conda: "envs/alignment.yaml"
+    shell:
+        "fastx_collapser -i {input.trimmed} -o {output.collapsed} -Q33 2> {log}"
+
+# ---------------------------------------------------------------------------
+# Step 6: extract the 20-bp designed barcode - cutadapt
+# ---------------------------------------------------------------------------
+
+rule extract_barcode:
+    """Step 6: strip flanking constants TAAAGCGGCCGCGAGGATCC and CGCAGACTCGACCACCTCTGAC,
+    keeping only the 20-bp designed barcode."""
+    input:
+        collapsed = "intermediate/collapsed_{sample}.fasta",
+    output:
+        barcode = "intermediate/barcode_{sample}.fasta",
+    log: "logs/cutadapt_{sample}.log"
+    conda: "envs/alignment.yaml"
+    shell:
+        "cutadapt -g TAAAGCGGCCGCGAGGATCC...CGCAGACTCGACCACCTCTGAC "
+        "-o {output.barcode} {input.collapsed} > {log} 2>&1"
+
+# ---------------------------------------------------------------------------
+# Step 7: align barcodes to Lib4
+# ---------------------------------------------------------------------------
+
+rule align:
+    """Step 7: align extracted barcodes to the Lib4 reference index."""
+    input:
+        barcode = "intermediate/barcode_{sample}.fasta",
+        index   = multiext("lib4_index", ".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2",
+                           ".rev.1.bt2", ".rev.2.bt2"),
+    output:
+        sam = "sam_files/{sample}.sam",
+    log: "logs/align_{sample}.log"
+    conda: "envs/alignment.yaml"
+    threads: 4
+    shell:
+        "bowtie2 -x lib4_index -f -U {input.barcode} -S {output.sam} "
+        "-p {threads} --no-1mm-upfront 2> {log}"
+
+# ---------------------------------------------------------------------------
+# Step 8: SAM -> BAM and barcode count tables (R)
+# ---------------------------------------------------------------------------
+
+rule count_tables:
+    """Step 8: extract_counts_from_samfiles_Lib4.R UNCHANGED. Produces the two
+    alignment_result_*.csv files used by Step 9."""
+    input:
+        sams      = expand("sam_files/{sample}.sam", sample=SAMPLES),
+        lib4_info = LIB4_INFO,
+    output:
+        normalized   = "outputs/alignment_result_normalized_in_house_pipeline.csv",
+        unnormalized = "outputs/alignment_result_unnormalized_in_house_pipeline.csv",
+    log: "logs/count_tables.log"
+    conda: "envs/r.yaml"
+    shell:
+        # The R script expects sam_files/ and Lib4_info_concise_060621.csv in cwd
+        # and writes its CSVs to cwd. Materialize, run, then move outputs to outputs/.
+        """
+        cp {input.lib4_info} ./Lib4_info_concise_060621.csv
+        Rscript "{RSCRIPTS}/../../2. HPC_cluster_scripts/requred_codes/extract_counts_from_samfiles_Lib4.R" > {log} 2>&1
+        mkdir -p outputs
+        mv alignment_result_normalized_in_house_pipeline.csv {output.normalized}
+        mv alignment_result_unnormalized_in_house_pipeline.csv {output.unnormalized}
+        """
+
+# ---------------------------------------------------------------------------
+# Step 9: per-project enhancer-activity quantification (R)
+# ---------------------------------------------------------------------------
+
+rule enhancer_activity:
+    """Step 9: project-specific R script. Produces the final activity tables."""
+    input:
+        normalized   = "outputs/alignment_result_normalized_in_house_pipeline.csv",
+        unnormalized = "outputs/alignment_result_unnormalized_in_house_pipeline.csv",
+        metadata     = ENH_META,
+    output:
+        STEP9_OUTPUTS.get(PROJECT, ["outputs/.step9.placeholder"]),
+    log: "logs/step9_{project}.log".format(project=PROJECT)
+    params:
+        script = lambda wc: STEP9_SCRIPTS[PROJECT],
+    conda: "envs/r.yaml"
+    shell:
+        """
+        cp {input.metadata} ./all_enhancer_metadata_111525.csv
+        Rscript "{params.script}" > {log} 2>&1
+        mkdir -p outputs
+        for f in *.csv; do
+            case "$f" in
+                ovca_sensor_activity_result_*.csv|activation_responsive_enhancer_screening_result_*.csv)
+                    mv "$f" outputs/
+                    ;;
+            esac
+        done
+        """
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _input_fastq_for(sample: str) -> str:
+    """Find {sample}.fastq[.gz] under inputs_dir."""
+    for ext in (".fastq", ".fastq.gz"):
+        cand = INPUTS_DIR / f"{sample}{ext}"
+        if cand.exists():
+            return str(cand)
+    # Fall back to first matching glob to support odd naming
+    matches = list(INPUTS_DIR.glob(f"{sample}*"))
+    if matches:
+        return str(matches[0])
+    raise WorkflowError(f"input FASTQ for sample '{sample}' not found in {INPUTS_DIR}")

@@ -1,0 +1,23 @@
+# TREND sample sheet — T-cell activation template.
+#
+# Source of the published numbers:
+#   sample names      — T_cell_activation_responsive_enhancer_screening_analysis.R:88
+#   dna_threshold     — same file, line 214
+#   bc_threshold      — same file, line 215
+
+project: T_cell_activation
+
+samples:
+  # Donor 1: rest vs stim contrast
+  - { id: rest_r1, fastq: fastqs/rest_r1.fastq.gz, role: RNA, condition: rest, donor: 1, replicate_group: 1, dna_threshold: 2 }
+  - { id: stim_r1, fastq: fastqs/stim_r1.fastq.gz, role: RNA, condition: stim, donor: 1, replicate_group: 1, dna_threshold: 3 }
+
+  # Donor 2: rest vs stim contrast
+  - { id: rest_r2, fastq: fastqs/rest_r2.fastq.gz, role: RNA, condition: rest, donor: 2, replicate_group: 2, dna_threshold: 2 }
+  - { id: stim_r2, fastq: fastqs/stim_r2.fastq.gz, role: RNA, condition: stim, donor: 2, replicate_group: 2, dna_threshold: 2 }
+
+analysis:
+  bc_threshold: 8      # higher than OvCa because T-cell donors are noisier
+  contrasts:
+    - { name: stim_vs_rest_donor1, stim: stim_r1, rest: rest_r1 }
+    - { name: stim_vs_rest_donor2, stim: stim_r2, rest: rest_r2 }
