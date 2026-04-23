@@ -1,6 +1,8 @@
 # TREND — Transcription-Factor-Responsive Enhancer Discovery
 
 > **📋 Reviewers, start here:** [`REVIEWERS.md`](REVIEWERS.md) — the 5-to-30-minute path from "I received a URL" to "I have verified the published claims on my own machine."
+>
+> **Note for reviewers:** the GitHub URL above is private during the manuscript review period. Reviewers should use the **anonymous.4open.science URL** the journal sent with the manuscript, which mirrors this repository with author identities stripped. The GitHub URL becomes public after paper acceptance.
 
 End-to-end pipeline + interactive dashboard for the TREND enhancer-screening platform described in [the manuscript](#citation). One install, one command per experiment, one folder per result. Runs on a workstation, an HPC cluster, or a Mac/PC laptop — same code, same outputs.
 
