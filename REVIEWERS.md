@@ -1,55 +1,104 @@
 # For reviewers — start here
 
-This document is the fastest path from "I just received a URL" to "I have verified the manuscript's claims on my own machine." Plan for **5 to 30 minutes** depending on which install path you pick.
+Pick the depth of review that matches your time:
 
-You do not need an HPC cluster, GPU, special hardware, or bioinformatics expertise to verify this manuscript. Everything in this document runs on a 2020-era laptop.
+| You want to… | Time | Section |
+|---|---|---|
+| **Browse the code and judge whether the platform is real** | 5–10 min | **Mode A** below — no installation, browser only |
+| **Hands-on verify the published claims on your own machine** | 20–60 min | **Mode B** at the bottom — clone + install + run |
 
----
+Most reviewers do Mode A only; it's enough to write an informed review. Mode B is for the most rigorous reviewers who want to re-run the analysis themselves on bundled tiny example data.
 
-## What you're verifying
+You do not need an HPC cluster, GPU, or specialized hardware for either mode. Everything in Mode B runs on a 2020-era laptop.
 
-Three nested claims, each with its own one-button check inside the dashboard:
-
-| Claim | Check |
-|---|---|
-| Our published activity tables exist and the comparator can read them | **Tier 1** (1 second, no tools needed) |
-| Our **Step-9 R script reproduces the published activity numbers** from the alignment count tables | **Tier 2** (~30 seconds, requires R) |
-| Our pipeline correctly transforms FASTQ reads into the post-alignment count matrix | **Tier 3** (~3 minutes, requires the full conda env or Docker) |
-
-Tier 2 is the load-bearing reproducibility check — it's the one that confirms the published numbers aren't fabricated.
+> **Reviewers cannot access the GitHub URL during the review period** (it's private — you'll see a 404). Use the anonymized mirror you received from the journal: 🔗 **https://anonymous.4open.science/r/TREND-Bioinformatics-Pipeline**. After paper acceptance the GitHub repo becomes public and the anonymous mirror is no longer needed.
 
 ---
 
-## Step 1 — Get the code
+# Mode A — Browse-only review (5–10 minutes, no install)
 
-> **Reviewers should not use the GitHub URL directly** — the repository is private during the review period and you'll see a 404. Use the anonymous mirror URL the journal forwarded to you.
+You can write a solid review just by reading the anonymized repository. Open it in your browser and walk through the four checks below.
 
-### Path 1 (recommended): the anonymous mirror
+## A.1 — Verify the code is real and complete
 
-The journal forwarded you this URL alongside the manuscript:
+Skim any of these files in the file tree (one click each on the anonymous page). You should see proper, working code — not skeleton fragments or TODOs:
 
-> 🔗 **https://anonymous.4open.science/r/TREND-Bioinformatics-Pipeline**
+| File | What it is | Approx. size |
+|---|---|---|
+| `pipeline/trend/cli.py` | The user-facing `trend` CLI with five subcommands (init / run / dashboard / status / preflight) | ~370 lines |
+| `pipeline/trend/workflow/Snakefile` | The Snakemake DAG that orchestrates all 9 pipeline steps | ~250 lines |
+| `dashboard/backend/library/classifications.py` | Computes the Figure 1B–E aggregates against Lambert / Reddy / D'Alessio | ~270 lines |
+| `dashboard/backend/library/queries.py` | Paginated, filterable, sortable enhancer queries | ~180 lines |
+| `dashboard/backend/oracle/run_example.py` | The three-tier reproducibility verifier | ~270 lines |
+| `dashboard/frontend/src/pages/Library.tsx` | Main dashboard page with all Figure 1 panels wired together | ~140 lines |
+| `tests/equivalence/helpers/csv_compare.py` | The C2 equivalence predicate (numerical-tolerance CSV comparator) | ~150 lines |
+| `codes/3. .../code_by_projects/ovarian_cancer/ovarian_cancer_specific_enhancer_screening_analysis.R` | The unchanged Step-9 R script that produces the published activity tables | original manuscript code |
 
-Open it in your browser. The README renders inline. To get the source code locally, click the **"Download Repository"** button at the top of the page — you'll get a ZIP with the full source (with author identities stripped from commits and identifying terms replaced with `XXXX-N` placeholders). Unzip and `cd` into the folder.
+## A.2 — Verify the manuscript's published numbers against the code & docs
 
-The mirror auto-updates from the maintainers' private repo on a regular cadence — if the authors push fixes during the review cycle, you'll see them on your next visit (hard-refresh in the browser if needed).
+Without running anything, these numbers should appear (as stated text) in the README, MANUAL.md, and the relevant code/data files. Cross-check against your manuscript copy:
 
-### Path 2: the GitHub URL (if you've been added as a named collaborator)
+| Claim in manuscript | Where to find it in the repo | Expected value |
+|---|---|---|
+| Total constructs in Lib4 | `README.md`, `MANUAL.md` | **2,730,581** |
+| Total TFs in library | `README.md`, `references/TREND_library_TF_breakdown.md` | **1,068** |
+| Confirmed sequence-specific TFs | `references/TREND_library_TF_breakdown.md`; reconciliation diagram | **729** (= 695 direct + 34 alias) |
+| DBD families covered | `dashboard/backend/library/classifications.py` constant `N_LAMBERT_DBD_FAMILIES_TOTAL` | **49** (Lambert taxonomy) |
+| Sensors in the Homeodomain family | `dashboard/backend/library/classifications.py` (Panel C aggregate) | **11,283** |
+| CaCTS cancer-MTF coverage | `references/TREND_library_TF_breakdown.md` | **204/273 = 74.7%** |
+| D'Alessio identity-TF coverage | same file | **354/503 = 70.4%** (mirror computes 354/505 = 70.9% with alias resolution; difference noted in the breakdown md) |
+| Top OvCa-selective enhancer | `project_data/final_enhancer_activity_results/ovarian_cancer/ovca_sensor_activity_result_concise.csv` row 1 | **E2F7 promoter (`ATTTTCCCGCCA_E2F7`), ≈26.6× OV8/IOSE selectivity** |
+| Top six DBD families account for | `references/TREND_library_TF_breakdown.md` | **67% of confirmed TFs** (489 / 729) |
 
-If you have a GitHub account and the corresponding author has added you as a collaborator on the private repo:
+Click into the CSVs in the file viewer — the anonymous interface renders CSVs as tables.
+
+## A.3 — Verify reproducibility infrastructure exists and is real
+
+| What | Where to find it | Expected size |
+|---|---|---|
+| Tier-2 fixtures (1,000-promoter subsample of published OvCa run) | `dashboard/example_data/ovca_step9/inputs/` and `expected/` | ~28 MB |
+| Tier-3 fixtures (50 promoters × 5 barcodes; 8 simulated FASTQ files; analytically-correct expected count matrix) | `dashboard/example_data/ovca_pipeline/inputs/` and `expected/` | ~6 MB |
+| Deterministic fixture generator | `tools/build_fixtures.py` | ~290 lines |
+| Tests | `tests/` (3 directories: `equivalence/`, `e2e/`, `cli/`) | 18 tests |
+| Bundled published activity tables (the comparison reference for Tier 2) | `project_data/final_enhancer_activity_results/{ovarian_cancer,T_cell_activation}/*.csv` | ~78 MB |
+
+## A.4 — Verify documentation depth and license
+
+- **`README.md`** — project overview, architecture diagram, three-piece deployment story
+- **`MANUAL.md`** — comprehensive user manual with install paths, dashboard tour, troubleshooting, glossary
+- **`DASHBOARD_PRD.md`** — full product requirements (for context on the design choices)
+- **`DESIGN.md`** — visual design system spec
+- **`references/TREND_library_TF_breakdown.md`** — the full reconciliation of the 1,068 / 729 / 695 / 49 numbers against Lambert
+- **`LICENSE`** — MIT
+
+## ✅ Mode A review checklist
+
+If you can answer "yes" to all of these, your review is well-supported:
+
+- [ ] At least three of the source files in §A.1 contain real, working code
+- [ ] The manuscript numbers in §A.2 match what's in the docs/code
+- [ ] The fixture data in §A.3 exists and is non-trivial
+- [ ] The documentation in §A.4 is substantial, not perfunctory
+- [ ] You have no concerns about code quality, organization, or licensing
+
+If you have any concerns, run Mode B to investigate further.
+
+---
+
+# Mode B — Hands-on verification (20–60 minutes)
+
+For reviewers who want to actually run the code and see green oracle badges.
+
+## B.1 — Get the code
+
+Click **"Download Repository"** at the top of the anonymous page. You get a ZIP with the full source code (with author identities stripped from commits and identifying terms replaced with `XXXX-N` placeholders). Unzip and `cd` into the folder.
 
 ```bash
-git clone https://github.com/SyntheticImmunity/TREND-Bioinformatics-Pipeline.git
+unzip TREND-Bioinformatics-Pipeline.zip
 cd TREND-Bioinformatics-Pipeline
 ```
 
-If `git clone` returns "Repository not found" or a 404 in the browser, you're hitting GitHub's standard private-repo response for non-collaborators — fall back to Path 1.
-
-After the paper is accepted, the GitHub repo will become public and this URL will work for everyone.
-
----
-
-## Step 2 — Pick an install path
+## B.2 — Pick an install path
 
 Three options, fastest first.
 
@@ -62,11 +111,11 @@ docker pull ghcr.io/syntheticimmunity/trend-dashboard:0.1.0
 docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:0.1.0
 ```
 
-Open `http://localhost:8000` in your browser. **Skip to Step 3.**
+Open **http://localhost:8000** in your browser. Skip to §B.3.
 
 The Docker image bundles bowtie2, samtools, cutadapt, fastx-toolkit, R, all R packages, Python, and the pre-built dashboard frontend. You don't install anything else.
 
-### Path B — Conda environment (recommended for adopters; ~10 minutes)
+### Path B — Conda environment (~10 minutes)
 
 **Prerequisites:** Miniconda or Mambaforge (https://docs.conda.io/projects/miniconda/).
 
@@ -78,34 +127,29 @@ trend preflight    # confirms every tool is installed
 trend dashboard    # serves on http://localhost:8000
 ```
 
-Open `http://localhost:8000`.
+Open **http://localhost:8000**.
 
-### Path C — Browse only, no install (~30 seconds)
+### Path C — Native (manual install, advanced)
 
-If you just want to read the code and look at figures without running anything:
+You install the bioinformatics tools system-wide (`brew install bowtie2 samtools cutadapt fastx_toolkit r`, etc.) and then `pip install -e ./pipeline`. Run `trend preflight` to confirm. See `MANUAL.md` § 3 for OS-specific instructions.
 
-- Open `MANUAL.md` in the GitHub web view for the comprehensive manual
-- Open `dashboard/frontend/src/pages/Library.tsx` to see how the panels are built
-- Open `pipeline/trend/cli.py` for the CLI implementation
-- Open `dashboard/backend/library/classifications.py` for the Figure 1 panel data math
+## B.3 — Run the three reproducibility tiers
 
----
+In the dashboard at `http://localhost:8000`, click **"Verify"** in the top navigation. You'll see three tier cards.
 
-## Step 3 — Verify the published claims (the dashboard "Verify" page)
+### Tier 1 — Quick check (~1 second)
 
-In the dashboard (whichever path you took), click **"Verify"** in the top nav.
+Click the first card → **"Run quick check"**. Expect a green **"all match"** badge in 1 second. This proves the comparator code can read and validate the bundled published outputs.
 
-You'll see three tier cards. Click the first card → **"Run quick check"** → expect a green **"all match"** badge in 1 second. This proves the comparator code is correctly reading the published outputs.
+### Tier 2 — Activity reproduction (~30 seconds)
 
-Click the second card → **"Run activity reproduction"** → expect another green **"all match"** badge in ~30 seconds. This is the load-bearing check: it re-runs the unchanged Step-9 R script (`codes/3. .../code_by_projects/ovarian_cancer/ovarian_cancer_specific_enhancer_screening_analysis.R`) against a 1,000-promoter slice of the published OvCa alignment data and verifies every output column row-for-row against the published activity tables (within `rtol=1e-6` numerical tolerance).
+Click the second card → **"Run activity reproduction"**. Expect a green badge in ~30 seconds. **This is the load-bearing reproducibility check.** It re-runs the unchanged Step-9 R script (`codes/3. .../code_by_projects/ovarian_cancer/ovarian_cancer_specific_enhancer_screening_analysis.R`) against a 1,000-promoter slice of the published OvCa alignment data and verifies every output column row-for-row against the published activity tables (numerical tolerance: `rtol=1e-6`).
 
-Click the third card → **"Run full pipeline reproduction"** → expect green **"all match"** in ~3 minutes. This invokes Snakemake against the bundled simulated FASTQs at `dashboard/example_data/ovca_pipeline/inputs/fastqs/` and runs Steps 1-9 end-to-end, then checks the post-alignment count matrix matches the analytical expectation.
+### Tier 3 — Full pipeline (~3 minutes)
 
-**If you see any red "differences found" badge:** click into the file card to expand the per-column diff. That's a real bug — please report it on the issue tracker.
+Click the third card → **"Run full pipeline reproduction"**. Expect a green badge in ~3 minutes. Snakemake invokes Steps 1–9 end-to-end on simulated FASTQs at `dashboard/example_data/ovca_pipeline/inputs/fastqs/` and validates that the post-alignment count matrix matches the analytically-computed expected counts.
 
-### Same checks via the command line
-
-If you prefer the terminal:
+### Or run via the CLI
 
 ```bash
 trend run --example ovarian_cancer --tier smoke
@@ -115,59 +159,37 @@ trend run --example ovarian_cancer --tier pipeline
 
 Each prints a self-contained report ending in `overall_pass: True`.
 
----
+## B.4 — Spot-check the dashboard against manuscript Figure 1
 
-## Step 4 — Spot-check the manuscript figures
+Click **"Library"** in the top nav and verify the live numbers match Figure 1:
 
-The dashboard's Library page (top nav → **Library**) is a faithful reconstruction of manuscript Figure 1 panels A–E. Compare these numbers between the dashboard and the paper:
-
-| Dashboard element | Manuscript reference | Expected number |
+| Dashboard element | Figure 1 panel | Expected number |
 |---|---|---|
-| Total constructs (summary card) | Figure 1 caption | 2,730,581 |
-| TFs in library (summary card) | "1,068 proteins" in Fig 1A | 1,068 |
-| Library composition pyramid | Fig 1B / "729 confirmed TFs" | 729 = 695 direct + 34 alias |
+| Library composition pyramid | Fig 1B reconciliation | 1,068 = 729 + 91 + 248 |
 | Panel B subtitle | Fig 1B | "729 TFs classified across 49 DBD families" |
-| Panel B Homeodomain bar | Fig 1B top bar | 176 TFs |
+| Panel B Homeodomain bar | Fig 1B top | 176 TFs |
 | Panel B "Other" bar | Fig 1B "Other (22 families + 15 unclassified)" | 57 TFs |
-| Panel C Homeodomain bar | Fig 1C top bar | 11,283 sensors |
+| Panel C Homeodomain bar | Fig 1C top | 11,283 sensors |
 | Panel D headline | Fig 1D | "204/273 (74.7%) candidate MTFs" |
 | Panel D 100% bars | Fig 1D leftmost | UCEC, STAD, SARC, LUSC |
-| Panel E headline | Fig 1E | "354/505 (70.9%) core identity TFs" — paper says 354/503 (70.4%); the 2-row drift in the denominator is from alias resolution edge cases, with no impact on the conclusion |
+| Panel E headline | Fig 1E | "354/505 (70.9%) core identity TFs" |
+| Selectivity scatter on /results | Fig 1F | E2F-family TFs at top of "most selective" list |
 
-Click any bar in any panel — the Enhancer Table at the bottom filters to those constructs in real time.
+Click any bar in any panel — the Enhancer Table at the bottom filters in real time.
 
----
+## B.5 — Done
 
-## Step 5 — Spot-check the OvCa analysis (Figure 1F)
+If every tier was green and the panel numbers matched, the published claims reproduce on your machine. If anything failed, please report on the issue tracker with:
 
-Top nav → **Results** (defaults to OvCa).
-
-The cancer-selectivity scatter at the top of the page is **Figure 1F**. Look at the **"Top 10 cancer-selective enhancers"** table just below. The list should be dominated by **E2F-family TFs** (E2F7, E2F8, E2F6, E2F3, TFDP1) — exactly the family the manuscript highlights. The single top hit is **`ATTTTCCCGCCA_E2F7`** at ≈26.6× OV8/IOSE selectivity.
-
-Click any red point in the scatter — it jumps to that promoter's detail in the library.
-
----
-
-## Step 6 — Done. Total time so far
-
-| Path you took | Total wall-clock |
-|---|---|
-| Path A (Docker) | ~10 minutes |
-| Path B (Conda) | ~20 minutes |
-| Path C (Browse only) | ~5 minutes |
-
-If everything was green, the published claims reproduce on your machine. If anything failed, please report on the issue tracker with:
-
-1. Which path you took (Docker / Conda / Native)
+1. Which install path you took (Docker / Conda / Native)
 2. The exact command that failed
 3. The output of `trend preflight`
-4. The dashboard's `/health` page screenshot if relevant
 
 ---
 
 ## Bonus — running TREND on your own data
 
-This is for adopters, not reviewers. See **MANUAL.md** § 7 for the walkthrough. Short version:
+For reviewers who also wear the adopter hat. See **MANUAL.md** § 7 for the walkthrough. Short version:
 
 ```bash
 trend init my-experiment --template T_cell_activation
@@ -178,7 +200,7 @@ trend dashboard --runs runs/
 
 ---
 
-## Where else to look in the repo
+## Where else to look
 
 | File | What's in it |
 |---|---|
@@ -190,6 +212,5 @@ trend dashboard --runs runs/
 | `pipeline/trend/workflow/Snakefile` | The Snakemake workflow definition |
 | `pipeline/conda-recipe/meta.yaml` | Bioconda submission recipe |
 | `tools/build_fixtures.py` | Deterministic fixture generator for the three reviewer tiers |
-| `tests/` | 18 passing tests (`pytest tests/ -v`) |
 
 Thank you for reviewing. We'd rather you find a bug than have it slip into the published artifact.
