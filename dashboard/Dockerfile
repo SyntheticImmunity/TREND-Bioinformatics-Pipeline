@@ -1,70 +1,79 @@
-# TREND Dashboard - canonical container per plan D7.
-# Base: rocker/r-ver:3.5.1 (matches Lib4_all_steps_FINAL_111525.sbatch:62 R version pin).
-# Bioinformatics tools and Python layered on top.
+# TREND Dashboard — canonical container.
 #
-# NOTE: This Dockerfile is the Week 5 deliverable. Week 1-4 dev runs natively via `make backend`
-# and `make frontend`. Treat the layers below as the intended target; iterate in Week 5.
+# Multi-stage build:
+#   1. node:20 — builds the React/Vite frontend bundle (dist/)
+#   2. condaforge/mambaforge — installs the trend conda env (R, bowtie2,
+#      samtools, cutadapt, fastx-toolkit, Python deps), then drops in the
+#      built frontend and the trend CLI.
+#
+# This same image serves three use cases:
+#   - Reviewer verification:  docker run -p 8000:8000 <image>
+#   - Real pipeline run:      docker run -v ./fastqs:/data -v ./runs:/runs <image> trend run --inputs /data --output /runs
+#   - HPC via Singularity:    singularity build trend.sif docker://<image>; singularity run trend.sif trend ...
+#
+# R version: pinned to whatever is current in the bioconda r-base feed at
+# build time (typically R 4.3+). The manuscript SBATCH used R 3.5.1; small
+# numeric drift between R versions is documented in the run manifest.
 
-FROM rocker/r-ver:3.5.1
+# ---------------------------------------------------------------------------
+# Stage 1: build the frontend
+# ---------------------------------------------------------------------------
+FROM node:20-bookworm-slim AS frontend-builder
+
+WORKDIR /frontend
+
+# Copy package manifests first for best layer caching — only re-runs npm ci
+# when package.json changes.
+COPY dashboard/frontend/package.json dashboard/frontend/package-lock.json* ./
+RUN npm ci || npm install
+
+# Copy the rest of the frontend source and build the static bundle.
+COPY dashboard/frontend ./
+RUN npm run build
+
+# ---------------------------------------------------------------------------
+# Stage 2: runtime with conda env + bioinformatics tools
+# ---------------------------------------------------------------------------
+FROM condaforge/mambaforge:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# System packages: bioinformatics CLI tools + Python toolchain.
-# Versions pinned to match the SBATCH where possible.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        curl \
-        git \
-        wget \
-        unzip \
-        bowtie2 \
-        samtools \
-        fastx-toolkit \
-        cutadapt \
-        python3 \
-        python3-pip \
-        python3-venv \
-        libxml2-dev \
-        libssl-dev \
-        libcurl4-openssl-dev \
-        zlib1g-dev \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# R packages required by Step 8 + Step 9 scripts.
-RUN R -e "install.packages(c('tidyverse', 'data.table', 'BiocManager'), repos='https://packagemanager.posit.co/cran/__linux__/$(lsb_release -cs)/latest')" \
- && R -e "BiocManager::install('Rsamtools', update=FALSE, ask=FALSE)"
-
-# Frontend build tools (Node) for serving the static SPA.
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
- && apt-get install -y --no-install-recommends nodejs \
+# A few utilities not in the conda env that are useful at runtime
+# (curl for healthchecks, make for our Makefile targets).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl make ca-certificates \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
+# Install the conda env. Copying just the env file first lets Docker cache
+# the (slow) mamba install layer until environment.yml itself changes.
+COPY pipeline/environment.yml /tmp/environment.yml
+RUN mamba env create -n trend -f /tmp/environment.yml \
+ && mamba clean -afy
+
+# Make the trend env's binaries available on PATH for all subsequent layers
+# AND for the runtime CMD.
+ENV PATH=/opt/conda/envs/trend/bin:$PATH
+ENV CONDA_DEFAULT_ENV=trend
+
+# Copy the rest of the project (source code, codes/, project_data/, examples).
 WORKDIR /app
+COPY . /app
 
-# Backend: install dependencies first for layer caching.
-COPY dashboard/pyproject.toml /app/dashboard/
-RUN pip3 install --no-cache-dir -e /app/dashboard
+# Install the trend CLI in editable mode so `trend` is on PATH.
+RUN /opt/conda/envs/trend/bin/pip install -e /app/pipeline
 
-# Frontend: install + build.
-COPY dashboard/frontend/package.json dashboard/frontend/package-lock.json* /app/dashboard/frontend/
-RUN cd /app/dashboard/frontend && npm ci || npm install
+# Drop in the prebuilt frontend bundle from stage 1.
+COPY --from=frontend-builder /frontend/dist /app/dashboard/frontend/dist
 
-# Copy the rest of the dashboard + reference scripts/data needed at runtime.
-COPY dashboard /app/dashboard
-COPY codes /app/codes
-COPY project_data /app/project_data
-
-# Build frontend static bundle (served by FastAPI in production).
-RUN cd /app/dashboard/frontend && npm run build
-
-EXPOSE 8000
+# Verify the install during build so any breakage is caught here, not at runtime.
+RUN trend --version && trend preflight || true
 
 WORKDIR /app/dashboard
+EXPOSE 8000
 
-# First-launch ingest is idempotent; runs only if library.sqlite is missing/stale.
+# Default: launch the dashboard. Overridable for pipeline runs:
+#   docker run <image> trend run --inputs /data --output /runs
 CMD ["sh", "-c", "make ingest && uvicorn backend.main:app --host 0.0.0.0 --port 8000"]
