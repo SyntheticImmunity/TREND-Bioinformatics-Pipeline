@@ -28,27 +28,25 @@ The installation and run loop. Adapt the project name and sample sheet to your e
 
 Pick the path matching your environment:
 
-#### Path A — Docker (easiest, zero dependency conflicts)
+#### Path A — Docker (available after paper acceptance)
+
+The Docker image is built and published by GitHub Actions on every release, but kept private during the manuscript review period (the public ghcr.io URL would reveal the author handle via the registry namespace, breaking review anonymity). After paper acceptance the image is made public with one click and the following commands become the recommended install for both reviewers and adopters:
 
 ```bash
+# Reviewer / dashboard verification (after acceptance)
 docker pull ghcr.io/syntheticimmunity/trend-dashboard:latest
 docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
-```
 
-Open `http://localhost:8000`. The same image runs the full pipeline on your own data via volume mounts:
-
-```bash
+# Real pipeline run on your own data (after acceptance)
 docker run -v /path/to/fastqs:/data -v /path/to/output:/runs \
   ghcr.io/syntheticimmunity/trend-dashboard:latest \
   trend run --inputs /data --output /runs/$(date +%F)
-```
 
-For HPC clusters, convert once to Singularity:
-
-```bash
+# HPC via Singularity (after acceptance)
 singularity build trend.sif docker://ghcr.io/syntheticimmunity/trend-dashboard:latest
-singularity run -B /scratch:/scratch trend.sif trend run --profile slurm --inputs /scratch/fastqs --output /scratch/runs
 ```
+
+**During the review period, please use Path B below.** It runs the same code with the same outputs.
 
 #### Path B — Conda environment (recommended; fully working today)
 
