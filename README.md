@@ -28,27 +28,33 @@ The installation and run loop. Adapt the project name and sample sheet to your e
 
 Pick the path matching your environment:
 
-#### Path A — Docker (available after paper acceptance)
-
-The Docker image is built and published by GitHub Actions on every release, but kept private during the manuscript review period (the public ghcr.io URL would reveal the author handle via the registry namespace, breaking review anonymity). After paper acceptance the image is made public with one click and the following commands become the recommended install for both reviewers and adopters:
+#### Path A — Docker (easiest; zero dependency conflicts)
 
 ```bash
-# Reviewer / dashboard verification (after acceptance)
+# Reviewer verification: launch the dashboard with bundled examples
 docker pull ghcr.io/syntheticimmunity/trend-dashboard:latest
 docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
+# → open http://localhost:8000
+```
 
-# Real pipeline run on your own data (after acceptance)
+The image bundles bowtie2, samtools, cutadapt, fastx-toolkit, R + tidyverse + Rsamtools, Python, all dependencies, and the pre-built dashboard frontend. Works on macOS, Windows (with Docker Desktop), and Linux. ~5 min from clean machine to running dashboard.
+
+The same image runs your own data — mount input/output directories and override the default command:
+
+```bash
 docker run -v /path/to/fastqs:/data -v /path/to/output:/runs \
   ghcr.io/syntheticimmunity/trend-dashboard:latest \
   trend run --inputs /data --output /runs/$(date +%F)
-
-# HPC via Singularity (after acceptance)
-singularity build trend.sif docker://ghcr.io/syntheticimmunity/trend-dashboard:latest
 ```
 
-**During the review period, please use Path B below.** It runs the same code with the same outputs.
+For HPC clusters that disallow Docker, convert once to Singularity:
 
-#### Path B — Conda environment (recommended; fully working today)
+```bash
+singularity build trend.sif docker://ghcr.io/syntheticimmunity/trend-dashboard:latest
+singularity run -B /scratch:/scratch trend.sif trend run --profile slurm --inputs /scratch/fastqs --output /scratch/runs
+```
+
+#### Path B — Conda environment
 
 ```bash
 git clone https://github.com/syntheticimmunity/TREND-Bioinformatics-Pipeline.git
