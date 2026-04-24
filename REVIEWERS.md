@@ -107,8 +107,8 @@ Three options, fastest first.
 **Prerequisites:** Docker Desktop (https://docker.com/products/docker-desktop). One-click install on Mac/Windows.
 
 ```bash
-docker pull ghcr.io/syntheticimmunity/trend-dashboard:0.1.0
-docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:0.1.0
+docker pull ghcr.io/syntheticimmunity/trend-dashboard:latest
+docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
 ```
 
 Open **http://localhost:8000** in your browser. Skip to §B.3.
