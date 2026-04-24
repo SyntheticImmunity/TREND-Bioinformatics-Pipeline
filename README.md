@@ -31,11 +31,24 @@ Pick the path matching your environment:
 #### Path A — Docker (easiest, zero dependency conflicts)
 
 ```bash
-docker pull ghcr.io/syntheticimmunity/trend-dashboard:0.1.0   # coming in v0.1.1
-docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:0.1.0
+docker pull ghcr.io/syntheticimmunity/trend-dashboard:latest
+docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
 ```
 
-> **Note:** Path A is published with the v0.1.1 release. Until then use Path B.
+Open `http://localhost:8000`. The same image runs the full pipeline on your own data via volume mounts:
+
+```bash
+docker run -v /path/to/fastqs:/data -v /path/to/output:/runs \
+  ghcr.io/syntheticimmunity/trend-dashboard:latest \
+  trend run --inputs /data --output /runs/$(date +%F)
+```
+
+For HPC clusters, convert once to Singularity:
+
+```bash
+singularity build trend.sif docker://ghcr.io/syntheticimmunity/trend-dashboard:latest
+singularity run -B /scratch:/scratch trend.sif trend run --profile slurm --inputs /scratch/fastqs --output /scratch/runs
+```
 
 #### Path B — Conda environment (recommended; fully working today)
 
