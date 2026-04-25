@@ -31,6 +31,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from backend import __version__, config, preflight
 from backend.library import queries
+from backend.library.pwms import load_pwms
 from backend.library.summary import SummaryNotBuilt, load_summary
 from backend.oracle.run_example import run_oracle
 from backend.pipeline import error_hints, runner
@@ -90,6 +91,17 @@ def library_dbd_families() -> dict:
         "families": cls.get("dbd_families", []),
         "n_classified_tfs": cls.get("totals", {}).get("n_classified_tfs", 0),
     }
+
+
+@app.get("/library/pwms")
+def library_pwms() -> dict:
+    """All position probability matrices, keyed by motif name.
+
+    Each value is a 4×W matrix as [[A...], [C...], [G...], [T...]] giving the
+    probability of each base at each position. Used by the frontend to render
+    sequence logos for every cancer-selective enhancer.
+    """
+    return {"pwms": load_pwms()}
 
 
 @app.get("/library/cacts_coverage")
@@ -195,6 +207,52 @@ def library_construct_detail(construct_id: str) -> JSONResponse:
     if result is None:
         raise HTTPException(status_code=404, detail=f"Construct '{construct_id}' not found.")
     return JSONResponse(result)
+
+
+@app.get("/library/constructs/{construct_id}/performance")
+def library_construct_performance(construct_id: str) -> dict:
+    """Per-project activity for a single promoter, across every project that has one.
+
+    Scans the same result CSVs that drive the strip plot. Returns a list of
+    `{project, title, metrics: {label: value}}` entries — empty list if the
+    promoter doesn't appear in any project.
+    """
+    import pandas as pd
+
+    out: list[dict] = []
+    for project, cfg in _SELECTIVITY_PROJECTS.items():
+        target = (
+            config.PROJECT_DATA_ROOT / "final_enhancer_activity_results" / project / cfg["csv"]
+        )
+        if not target.exists():
+            continue
+        df = pd.read_csv(target)
+        match = df[df["promoter_name"] == construct_id]
+        if match.empty:
+            continue
+        row = match.iloc[0]
+
+        def _val(col: str) -> float | None:
+            if col not in row or pd.isna(row[col]):
+                return None
+            return round(float(row[col]), 4)
+
+        exp_label, ctrl_label = cfg["title"].split("/")
+        metrics: dict[str, float | None] = {
+            f"{exp_label} activity": _val(cfg["exp_col"]),
+            f"{ctrl_label} activity": _val(cfg["ctrl_col"]),
+            f"{cfg['title']} ratio": _val(cfg["ratio_col"]),
+        }
+        out.append({
+            "project": project,
+            "title": cfg["title"],
+            "tf": (str(row[cfg["tf_col"]]) if cfg["tf_col"] in row and pd.notna(row[cfg["tf_col"]]) else None),
+            "by_ppm_name": _normalize_pwm_name(row["by_ppm_name"]) if "by_ppm_name" in row and pd.notna(row["by_ppm_name"]) else None,
+            "rank": int(row["rank"]) if "rank" in row and pd.notna(row["rank"]) else None,
+            "metrics": metrics,
+        })
+
+    return {"promoter_name": construct_id, "projects": out}
 
 
 @app.get("/preflight")
@@ -311,70 +369,102 @@ def run_example(
     }
 
 
+_PWM_VERSION_SUFFIX = __import__("re").compile(r"_v\d+$")
+
+
+def _normalize_pwm_name(raw: object) -> str:
+    """Match the CSV's by_ppm_name to the canonical key in the PPM file.
+
+    The CSV stores either the original FASTA header line (`NAME description...`)
+    or `NAME` with a trailing `_vN` revision suffix. The PPM file is keyed by
+    NAME alone. Splitting on whitespace and stripping the version suffix
+    recovers the canonical name in both formats.
+    """
+    first = str(raw).split()[0] if raw is not None else ""
+    return _PWM_VERSION_SUFFIX.sub("", first)
+
+
+# Project-agnostic schema: the strip plot endpoint maps each project's
+# experimental/control columns onto the same OVR/IOSE shape so the frontend
+# renders identically regardless of dataset.
+_SELECTIVITY_PROJECTS: dict[str, dict[str, str]] = {
+    "ovarian_cancer": {
+        "csv": "ovca_sensor_activity_result_concise.csv",
+        "exp_col": "mean_OV8_RD_ratio",
+        "ctrl_col": "mean_IOSE_RD_ratio",
+        "ratio_col": "mean_OV8_to_IOSE_RD_ratio",
+        "tf_col": "TF_name_human_curated",
+        "title": "OV8/IOSE",
+    },
+    "T_cell_activation": {
+        "csv": "activation_responsive_enhancer_screening_result_donor1.csv",
+        "exp_col": "median_stim_Lib4_RD_ratio_r1",
+        "ctrl_col": "median_rest_Lib4_RD_ratio_r1",
+        "ratio_col": "stim_to_rest_RD_ratio_r1",
+        "tf_col": "TF_name_human_curated",
+        "title": "Stim/Rest",
+    },
+}
+
+
 @app.get("/results/selectivity_scatter")
 def results_selectivity_scatter(
     project: str = Query(default="ovarian_cancer"),
-    selectivity_threshold: float = Query(default=2.0, description="log2 fold-change cutoff for highlighting cancer-selective enhancers."),
-    min_activity: float = Query(default=0.1, description="Minimum tumor RD ratio to include."),
+    selectivity_threshold: float = Query(default=2.0, description="log2 fold-change cutoff for highlighting selective enhancers."),
+    min_activity: float = Query(default=0.1, description="Minimum experimental RD ratio to include."),
 ) -> dict:
-    """Panel F source data: cancer-selectivity volcano-style scatter for OvCa.
+    """Strip-plot source data, project-agnostic.
 
-    For each promoter we compute:
-      x = log2(mean_OV8_to_IOSE_RD_ratio)
-      y = log10(mean_OV8_RD_ratio)
-    Promoters where log2(selectivity) >= threshold AND OV8 activity > 0 are
-    flagged 'selective' so the frontend can highlight them in red.
+    Each project supplies its own experimental/control columns; we map them
+    onto a single OVR/IOSE shape:
+      x = log2(experimental / control)
+      y = log10(experimental)
     """
     import math
     import pandas as pd
 
-    if project != "ovarian_cancer":
-        raise HTTPException(status_code=400, detail="Selectivity scatter is currently OvCa-specific.")
+    cfg = _SELECTIVITY_PROJECTS.get(project)
+    if not cfg:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No strip-plot config for project '{project}'.",
+        )
 
     target = (
-        config.PROJECT_DATA_ROOT
-        / "final_enhancer_activity_results"
-        / "ovarian_cancer"
-        / "ovca_sensor_activity_result_concise.csv"
+        config.PROJECT_DATA_ROOT / "final_enhancer_activity_results" / project / cfg["csv"]
     )
     if not target.exists():
         raise HTTPException(status_code=404, detail=f"Result file not found: {target}")
 
-    df = pd.read_csv(target)
-    df = df.dropna(subset=["mean_OV8_RD_ratio", "mean_OV8_to_IOSE_RD_ratio"])
-    df = df[(df["mean_OV8_RD_ratio"] > min_activity) & (df["mean_OV8_to_IOSE_RD_ratio"] > 0)]
+    exp_col, ctrl_col, ratio_col, tf_col = cfg["exp_col"], cfg["ctrl_col"], cfg["ratio_col"], cfg["tf_col"]
 
-    # Compute axes; cap log values to keep the chart legible.
-    df["log2_selectivity"] = df["mean_OV8_to_IOSE_RD_ratio"].apply(
-        lambda v: math.log2(v) if v > 0 else None
-    )
-    df["log10_activity"] = df["mean_OV8_RD_ratio"].apply(
-        lambda v: math.log10(v) if v > 0 else None
-    )
+    df = pd.read_csv(target)
+    df = df.dropna(subset=[exp_col, ratio_col])
+    df = df[(df[exp_col] > min_activity) & (df[ratio_col] > 0)]
+
+    df["log2_selectivity"] = df[ratio_col].apply(lambda v: math.log2(v) if v > 0 else None)
+    df["log10_activity"] = df[exp_col].apply(lambda v: math.log10(v) if v > 0 else None)
     df = df.dropna(subset=["log2_selectivity", "log10_activity"])
 
     df["selective"] = df["log2_selectivity"] >= selectivity_threshold
-
-    # Sort by selectivity desc so highlighted points draw on top in the SVG.
     df = df.sort_values("log2_selectivity", ascending=True).reset_index(drop=True)
 
-    # Keep payload small — rounding to 3 decimals.
     rows = [
         {
             "promoter_name": str(r.promoter_name),
-            "tf": str(r.TF_name_human_curated) if pd.notna(r.TF_name_human_curated) else "",
+            "tf": str(getattr(r, tf_col)) if pd.notna(getattr(r, tf_col)) else "",
+            "by_ppm_name": _normalize_pwm_name(r.by_ppm_name) if pd.notna(r.by_ppm_name) else "",
+            "rank": int(r.rank) if pd.notna(r.rank) else None,
             "x": round(float(r.log2_selectivity), 3),
             "y": round(float(r.log10_activity), 3),
-            "selectivity_ratio": round(float(r.mean_OV8_to_IOSE_RD_ratio), 3),
-            "ov8_activity": round(float(r.mean_OV8_RD_ratio), 3),
-            "iose_activity": round(float(r.mean_IOSE_RD_ratio), 3) if pd.notna(r.mean_IOSE_RD_ratio) else None,
+            "selectivity_ratio": round(float(getattr(r, ratio_col)), 3),
+            "ov8_activity": round(float(getattr(r, exp_col)), 3),
+            "iose_activity": round(float(getattr(r, ctrl_col)), 3) if pd.notna(getattr(r, ctrl_col)) else None,
             "selective": bool(r.selective),
         }
         for r in df.itertuples()
     ]
     n_selective = sum(1 for r in rows if r["selective"])
-
-    # Top-10 most selective for a sidebar list.
     top10 = sorted(rows, key=lambda r: -r["x"])[:10]
 
     return {
@@ -383,8 +473,9 @@ def results_selectivity_scatter(
         "min_activity": min_activity,
         "n_total": len(rows),
         "n_selective": n_selective,
-        "x_label": "log2(OV8 / IOSE) RD ratio",
-        "y_label": "log10(OV8 RD ratio)",
+        "title": cfg["title"],
+        "x_label": f"log2({cfg['title']}) RD ratio",
+        "y_label": f"log10({cfg['title'].split('/')[0]} RD ratio)",
         "rows": rows,
         "top_selective": top10,
     }
@@ -498,3 +589,5 @@ def run() -> None:
     import uvicorn
 
     uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=False)
+
+

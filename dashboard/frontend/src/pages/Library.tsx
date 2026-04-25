@@ -2,11 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import { SummaryCard } from "@/components/SummaryCard";
-import { Histogram } from "@/components/Histogram";
 import { EnhancerTable } from "@/components/EnhancerTable";
 import { HorizontalFamilyBar } from "@/components/HorizontalFamilyBar";
 import { StackedCoverageBar } from "@/components/StackedCoverageBar";
-import { CompositionPyramid } from "@/components/CompositionPyramid";
 import {
   ActiveFilterPill,
   LibraryFilterProvider,
@@ -61,25 +59,9 @@ function LibraryContent() {
               label="Median barcodes / promoter"
               value={data.median_barcodes_per_promoter.toFixed(1)}
             />
-            <SummaryCard label="TFs (human-curated)" value={fmt(data.total_tfs_curated)} />
+            <SummaryCard label="DNA-binding proteins" value={fmt(data.total_tfs_curated)} />
             <SummaryCard label="Variable regions" value={fmt(data.total_variable_regions)} />
           </section>
-
-          {/* Library composition pyramid (decomposition of 1,068) */}
-          {data.classifications?.composition_breakdown && (
-            <section className="mt-16 card">
-              <h3 className="text-card-title font-semibold">Library target composition</h3>
-              <p className="text-sm text-muted mt-1">
-                Decomposition of the {data.total_tfs_curated.toLocaleString()} unique
-                library targets into confirmed sequence-specific TFs (Lambert), Lambert
-                entries flagged as non-TFs, and proteins not present in the Lambert
-                census (derived from protein-DNA interaction screens).
-              </p>
-              <div className="mt-6">
-                <CompositionPyramid breakdown={data.classifications.composition_breakdown} />
-              </div>
-            </section>
-          )}
 
           {/* Panel B */}
           <section className="mt-16 card">
@@ -137,35 +119,6 @@ function LibraryContent() {
             </p>
             <div className="mt-6">
               <StackedCoverageBar variant="dalessio" />
-            </div>
-          </section>
-
-          {/* Existing histograms (kept) */}
-          <section className="mt-16 grid gap-6 lg:grid-cols-2">
-            <div className="card">
-              <h3 className="text-card-title font-semibold">Barcodes per promoter</h3>
-              <p className="text-sm text-muted mt-1">
-                How many distinct barcoded constructs back each promoter design.
-              </p>
-              <div className="mt-6">
-                <Histogram
-                  data={data.barcodes_per_promoter_histogram}
-                  xLabel="Barcodes per promoter"
-                />
-              </div>
-            </div>
-            <div className="card">
-              <h3 className="text-card-title font-semibold">Variable region length</h3>
-              <p className="text-sm text-muted mt-1">
-                Distribution of variable-region sequence lengths across the enhancer
-                metadata.
-              </p>
-              <div className="mt-6">
-                <Histogram
-                  data={data.variable_region_length_histogram}
-                  xLabel="Length (bp)"
-                />
-              </div>
             </div>
           </section>
 

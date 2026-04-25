@@ -13,7 +13,7 @@ const VARIABLE_REGION_PREVIEW = 24;
 type SortDir = "asc" | "desc";
 
 interface ColumnDef {
-  id: EnhancerSortColumn | "DBD_family" | "TF_assessment";
+  id: EnhancerSortColumn | "DBD_family";
   header: string;
   align?: "left" | "right";
   width?: string;
@@ -22,7 +22,6 @@ interface ColumnDef {
 const COLUMNS: ColumnDef[] = [
   { id: "TF", header: "TF" },
   { id: "DBD_family", header: "DBD family" },
-  { id: "TF_assessment", header: "Lambert" },
   { id: "TFBS_sequence", header: "TFBS" },
   { id: "variable_region", header: "Variable region" },
   { id: "by_ppm_name", header: "PPM Name" },
@@ -39,15 +38,6 @@ const SORTABLE_COLUMN_IDS = new Set<string>([
   "rank",
   "n_barcodes",
 ]);
-
-// Compact one-letter shorthand for Lambert TF assessment.
-const ASSESSMENT_BADGE: Record<string, { short: string; full: string; tone: string }> = {
-  "Known motif": { short: "K", full: "Known motif", tone: "bg-charcoal-82 text-cream-light" },
-  "Inferred motif": { short: "I", full: "Inferred motif", tone: "bg-charcoal-40 text-charcoal" },
-  "Likely to be sequence specific TF": { short: "L", full: "Likely TF", tone: "bg-charcoal-40 text-charcoal" },
-  "Unlikely to be sequence specific TF": { short: "U", full: "Unlikely TF", tone: "border border-charcoal-40 text-charcoal-82" },
-  "ssDNA/RNA binding": { short: "ss", full: "ssDNA/RNA binding", tone: "border border-charcoal-40 text-charcoal-82" },
-};
 
 function useDebounced<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -225,9 +215,6 @@ export function EnhancerTable() {
             )}
             {!isPending &&
               (data?.rows ?? []).map((row: EnhancerRow, i) => {
-                const assessment = row.Lambert_TF_assessment
-                  ? ASSESSMENT_BADGE[row.Lambert_TF_assessment]
-                  : null;
                 return (
                   <tr
                     key={`${row.TF}_${row.TFBS_sequence}_${row.by_ppm_name}_${row.rank}_${i}`}
@@ -241,21 +228,6 @@ export function EnhancerTable() {
                         <span className="text-xs text-charcoal-82">{row.Lambert_DBD_family}</span>
                       ) : (
                         <span className="text-xs text-muted">—</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 pr-4 align-top">
-                      {assessment ? (
-                        <span
-                          className={cn(
-                            "inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded-standard text-[10px] uppercase tracking-wide",
-                            assessment.tone,
-                          )}
-                          title={assessment.full}
-                        >
-                          {assessment.short}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted">{row.Lambert_matched === "No" ? "—" : ""}</span>
                       )}
                     </td>
                     <td className="py-2.5 pr-4 align-top">

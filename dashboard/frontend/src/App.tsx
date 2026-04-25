@@ -7,6 +7,7 @@ import ConstructDetail from "@/pages/ConstructDetail";
 import Run from "@/pages/Run";
 import RunExample from "@/pages/RunExample";
 import Results from "@/pages/Results";
+import PwmDetail from "@/pages/PwmDetail";
 import Project from "@/pages/Project";
 import Glossary from "@/pages/Glossary";
 import Health from "@/pages/Health";
@@ -57,12 +58,6 @@ function Layout() {
       <main className="flex-1">
         <Outlet />
       </main>
-
-      <footer className="border-t border-cream-border mt-22">
-        <div className="mx-auto max-w-[1200px] px-6 py-8 text-sm text-muted">
-          TREND · MIT licensed
-        </div>
-      </footer>
     </div>
   );
 }
@@ -77,6 +72,7 @@ export default function App() {
         <Route path="/run" element={<Run />} />
         <Route path="/run/example" element={<RunExample />} />
         <Route path="/results" element={<Results />} />
+        <Route path="/results/pwm/:pwmName" element={<PwmDetail />} />
         <Route path="/project" element={<Project />} />
         <Route path="/glossary" element={<Glossary />} />
         <Route path="/health" element={<Health />} />

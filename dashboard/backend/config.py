@@ -29,6 +29,7 @@ ENHANCER_METADATA_CSV = (
     / "required_metadata"
     / "all_enhancer_metadata_111525.csv"
 )
+PWM_FILE = REPO_ROOT / "references" / "all_ENCODE_MotifDb_ppm_no_NA_v1.txt"
 
 # Generated runtime state (gitignored).
 STATE_DIR = DASHBOARD_ROOT / "backend" / "state"
