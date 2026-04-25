@@ -236,7 +236,9 @@ def list_enhancers(
     where_sql = (" WHERE " + " AND ".join(where)) if where else ""
 
     # Always include a deterministic secondary sort for stable pagination.
-    order_sql = f"ORDER BY {sort_expr} {sort_dir_sql}, TF ASC, TFBS_sequence ASC, by_ppm_name ASC, rank ASC"
+    # rank is the immediate secondary so a "sort by TF" naturally groups
+    # rank 1, 2, 3 within each TF before falling back to TFBS / PPM tiebreakers.
+    order_sql = f"ORDER BY {sort_expr} {sort_dir_sql}, TF ASC, rank ASC, TFBS_sequence ASC, by_ppm_name ASC"
 
     with _connect(db_path) as con:
         total = con.execute(
@@ -263,13 +265,26 @@ def list_enhancers(
     )
 
 
-def get_construct(promoter_name_bc: str, db_path: Path = config.LIBRARY_DB) -> dict | None:
-    """Return one construct + its enhancer-metadata join row (or None)."""
+def get_construct(identifier: str, db_path: Path = config.LIBRARY_DB) -> dict | None:
+    """Return one construct + its enhancer-metadata join row (or None).
+
+    Accepts either a `promoter_name_bc` (the fully-barcoded construct ID used
+    throughout Lib4) or a `promoter_name` (the non-barcoded promoter ID that
+    appears in the per-promoter result CSVs and the cancer-selective table).
+    When given the latter, returns one of the barcoded variants — enough to
+    populate the metadata view; per-condition activity is fetched separately
+    via the performance endpoint.
+    """
     with _connect(db_path) as con:
         row = con.execute(
             "SELECT * FROM constructs WHERE promoter_name_bc = ?",
-            (promoter_name_bc,),
+            (identifier,),
         ).fetchone()
+        if row is None:
+            row = con.execute(
+                "SELECT * FROM constructs WHERE promoter_name = ? LIMIT 1",
+                (identifier,),
+            ).fetchone()
         if row is None:
             return None
         construct = dict(row)

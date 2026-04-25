@@ -5,7 +5,6 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { GlossaryTooltip } from "@/components/GlossaryTooltip";
 import { SelectivityScatter } from "@/components/SelectivityScatter";
-import { ExpressionScatterStub } from "@/components/ExpressionScatterStub";
 
 const PAGE_SIZE = 100;
 
@@ -88,25 +87,19 @@ export default function Results() {
         </label>
       </section>
 
-      {project === "ovarian_cancer" && (
-        <>
-          <section className="mt-12 card">
-            <h2 className="text-card-title font-semibold">Cancer selectivity</h2>
-            <p className="text-sm text-muted mt-1">
-              Differential enhancer activity in OV8 (ovarian cancer) vs IOSE
-              (normal ovarian epithelial control). Cancer-selective enhancers
-              cluster on the right at high activity.
-            </p>
-            <div className="mt-6">
-              <SelectivityScatter project="ovarian_cancer" />
-            </div>
-          </section>
-
-          <section className="mt-8">
-            <ExpressionScatterStub project="ovarian_cancer" />
-          </section>
-        </>
+      {project && (
+        <section className="mt-12 card">
+          <h2 className="text-card-title font-semibold">Selectivity</h2>
+          <p className="text-sm text-muted mt-1">
+            Differential enhancer activity (experimental vs. control). Selective
+            enhancers cluster at the top of the strip plot.
+          </p>
+          <div className="mt-6">
+            <SelectivityScatter project={project} />
+          </div>
+        </section>
       )}
+
 
       {error && (
         <div className="mt-8 card border-charcoal-40">

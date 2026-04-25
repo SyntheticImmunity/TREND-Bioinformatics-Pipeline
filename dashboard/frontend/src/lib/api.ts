@@ -205,6 +205,18 @@ export const api = {
     getJson<{ construct: ConstructRow & Record<string, unknown>; metadata: Record<string, unknown> | null }>(
       `/library/constructs/${encodeURIComponent(id)}`,
     ),
+  constructPerformance: (id: string) =>
+    getJson<{
+      promoter_name: string;
+      projects: Array<{
+        project: string;
+        title: string;
+        tf: string | null;
+        by_ppm_name: string | null;
+        rank: number | null;
+        metrics: Record<string, number | null>;
+      }>;
+    }>(`/library/constructs/${encodeURIComponent(id)}/performance`),
   listEnhancers: (params: {
     q?: string;
     tf?: string;
@@ -275,11 +287,14 @@ export const api = {
     getJson<SelectivityScatter>(
       `/results/selectivity_scatter?project=${encodeURIComponent(project)}`,
     ),
+  pwms: () => getJson<{ pwms: Record<string, number[][]> }>("/library/pwms"),
 };
 
 export interface SelectivityPoint {
   promoter_name: string;
   tf: string;
+  by_ppm_name: string;
+  rank: number | null;
   x: number;
   y: number;
   selectivity_ratio: number;
@@ -294,6 +309,7 @@ export interface SelectivityScatter {
   min_activity: number;
   n_total: number;
   n_selective: number;
+  title: string;
   x_label: string;
   y_label: string;
   rows: SelectivityPoint[];
