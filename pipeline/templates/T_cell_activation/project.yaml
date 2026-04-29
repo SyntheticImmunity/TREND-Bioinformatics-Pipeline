@@ -1,7 +1,7 @@
 name: T_cell_activation
 display_name: T-cell activation-responsive enhancer screening
 description: |
-  Per-donor activity contrast between resting and stimulated CD4 T cells.
+  Per-donor activity contrast between resting and stimulated primary human T cells (total CD4+CD8).
   Activation-induced enhancers identified per donor; reproducibility across
   donors is the primary readout.
 
