@@ -31,10 +31,10 @@ columns:
     description: Rank of this PPM among multiple PPMs for the same TF.
   - name: median_rest_Lib4_RD_ratio_r1
     type: float
-    description: Median RNA/DNA activity ratio across barcodes in resting CD4 cells (replicate 1).
+    description: Median RNA/DNA activity ratio across barcodes in resting primary human T cells (total CD4+CD8), replicate 1.
   - name: median_stim_Lib4_RD_ratio_r1
     type: float
-    description: Median RNA/DNA activity ratio across barcodes in stimulated CD4 cells (replicate 1).
+    description: Median RNA/DNA activity ratio across barcodes in stimulated primary human T cells (total CD4+CD8), replicate 1.
   - name: rest_r1_n_bc
     type: integer
     description: Number of supporting barcodes contributing to the rest-condition median.

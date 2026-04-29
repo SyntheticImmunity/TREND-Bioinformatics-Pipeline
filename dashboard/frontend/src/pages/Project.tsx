@@ -30,7 +30,7 @@ export default function Project() {
         <article className="card">
           <h2 className="text-card-title font-semibold">T-cell activation</h2>
           <p className="mt-3 text-sm text-charcoal-82">
-            Per-donor activity contrast between resting and stimulated CD4 T cells.
+            Per-donor activity contrast between resting and stimulated primary human T cells (total CD4+CD8).
             Activation-induced enhancers identified per donor; reproducibility
             across donors is the primary readout.
           </p>
