@@ -35,7 +35,12 @@ export function SequenceLogo({ ppm, width = 120, height = 40, showAxis = false }
   }
   const nPos = ppm[0].length;
   const axisWidth = showAxis ? 0.6 : 0;
-  const viewW = nPos + axisWidth;
+  // Padding between the axis line and the first letter so the letter doesn't
+  // visually overlap the axis (was 0 before, which let position-1 glyphs
+  // cover the vertical line).
+  const axisGap = showAxis ? 0.2 : 0;
+  const letterStart = axisWidth + axisGap;
+  const viewW = nPos + letterStart;
   const viewH = 2;
 
   return (
@@ -49,9 +54,35 @@ export function SequenceLogo({ ppm, width = 120, height = 40, showAxis = false }
     >
       {showAxis && (
         <g>
-          <line x1={axisWidth} y1={0} x2={axisWidth} y2={viewH} stroke="#cfcdc6" strokeWidth={0.02} />
-          <text x={axisWidth - 0.1} y={0.15} fontSize={0.3} textAnchor="end" fill="#5f5f5d">2</text>
-          <text x={axisWidth - 0.1} y={2} fontSize={0.3} textAnchor="end" fill="#5f5f5d">0</text>
+          <line
+            x1={axisWidth}
+            y1={0}
+            x2={axisWidth}
+            y2={viewH}
+            stroke="#5f5f5d"
+            strokeWidth={0.04}
+            vectorEffect="non-scaling-stroke"
+          />
+          <text
+            x={axisWidth - 0.1}
+            y={0}
+            fontSize={0.3}
+            textAnchor="end"
+            dominantBaseline="hanging"
+            fill="#5f5f5d"
+          >
+            2
+          </text>
+          <text
+            x={axisWidth - 0.1}
+            y={viewH}
+            fontSize={0.3}
+            textAnchor="end"
+            dominantBaseline="alphabetic"
+            fill="#5f5f5d"
+          >
+            0
+          </text>
         </g>
       )}
       {Array.from({ length: nPos }).map((_, i) => {
@@ -73,7 +104,7 @@ export function SequenceLogo({ ppm, width = 120, height = 40, showAxis = false }
           return (
             <text
               key={`${i}-${letter}`}
-              x={i + axisWidth}
+              x={i + letterStart}
               y={top + h}
               fontSize={h / CAP_HEIGHT_RATIO}
               fontFamily="ui-monospace, 'SF Mono', Consolas, monospace"

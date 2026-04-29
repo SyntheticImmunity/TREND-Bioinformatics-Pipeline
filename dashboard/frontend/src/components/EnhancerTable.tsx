@@ -6,7 +6,9 @@ import { api, type EnhancerRow, type EnhancerSortColumn } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { useLibraryFilter } from "@/components/LibraryFilters";
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE_OPTIONS = [50, 100, 500, 1000] as const;
+const DEFAULT_PAGE_SIZE = 100;
+type PageSize = typeof PAGE_SIZE_OPTIONS[number];
 const SEARCH_DEBOUNCE_MS = 300;
 const VARIABLE_REGION_PREVIEW = 24;
 
@@ -21,9 +23,9 @@ interface ColumnDef {
 
 const COLUMNS: ColumnDef[] = [
   { id: "TF", header: "TF" },
-  { id: "DBD_family", header: "DBD family" },
+  { id: "DBD_family", header: "DBD Family" },
   { id: "TFBS_sequence", header: "TFBS" },
-  { id: "variable_region", header: "Variable region" },
+  { id: "variable_region", header: "Variable Region" },
   { id: "by_ppm_name", header: "PPM Name" },
   { id: "rank", header: "Rank", align: "right" },
   { id: "n_barcodes", header: "# Barcodes", align: "right" },
@@ -38,6 +40,16 @@ const SORTABLE_COLUMN_IDS = new Set<string>([
   "rank",
   "n_barcodes",
 ]);
+
+// Per-column filter keys → backend query param. Columns absent from this map
+// (rank, n_barcodes) get no filter input.
+const COLUMN_FILTER_KEYS: Record<string, "tf_contains" | "dbd_contains" | "tfbs_contains" | "vr_contains" | "ppm_contains"> = {
+  TF: "tf_contains",
+  DBD_family: "dbd_contains",
+  TFBS_sequence: "tfbs_contains",
+  variable_region: "vr_contains",
+  by_ppm_name: "ppm_contains",
+};
 
 function useDebounced<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -88,28 +100,37 @@ function SortIndicator({ active, dir }: { active: boolean; dir: SortDir }) {
 export function EnhancerTable() {
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebounced(searchInput, SEARCH_DEBOUNCE_MS);
+  const [colFilters, setColFilters] = useState<Record<string, string>>({});
+  const debouncedColFilters = useDebounced(colFilters, SEARCH_DEBOUNCE_MS);
   const [sortBy, setSortBy] = useState<EnhancerSortColumn>("TF");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_PAGE_SIZE);
   const { filter } = useLibraryFilter();
 
-  // Reset to first page whenever the search, sort, or panel filter changes.
+  const colFiltersKey = JSON.stringify(debouncedColFilters);
+  // Reset to first page whenever the search, sort, panel filter, OR page size changes.
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, sortBy, sortDir, filter.kind, filter.value]);
+  }, [debouncedSearch, colFiltersKey, sortBy, sortDir, filter.kind, filter.value, pageSize]);
 
-  const offset = page * PAGE_SIZE;
+  const offset = page * pageSize;
   const { data, isPending, error, isFetching } = useQuery({
-    queryKey: ["enhancers", debouncedSearch, sortBy, sortDir, offset, filter.kind, filter.value],
+    queryKey: ["enhancers", debouncedSearch, colFiltersKey, sortBy, sortDir, offset, pageSize, filter.kind, filter.value],
     queryFn: () =>
       api.listEnhancers({
         q: debouncedSearch || undefined,
+        tf_contains: debouncedColFilters["TF"] || undefined,
+        dbd_contains: debouncedColFilters["DBD_family"] || undefined,
+        tfbs_contains: debouncedColFilters["TFBS_sequence"] || undefined,
+        vr_contains: debouncedColFilters["variable_region"] || undefined,
+        ppm_contains: debouncedColFilters["by_ppm_name"] || undefined,
         dbd_family: filter.kind === "dbd_family" && filter.value ? filter.value : undefined,
         cacts_tumor: filter.kind === "cacts_tumor" && filter.value ? filter.value : undefined,
         dalessio_system: filter.kind === "dalessio_system" && filter.value ? filter.value : undefined,
         sort_by: sortBy,
         sort_dir: sortDir,
-        limit: PAGE_SIZE,
+        limit: pageSize,
         offset,
       }),
     placeholderData: (prev) => prev,
@@ -126,7 +147,7 @@ export function EnhancerTable() {
     }
   }
 
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 0;
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / pageSize)) : 0;
 
   return (
     <div className="card">
@@ -172,7 +193,7 @@ export function EnhancerTable() {
 
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
-          <thead className="border-b border-cream-border text-xs uppercase tracking-wide text-muted">
+          <thead className="border-b border-cream-border text-xs tracking-wide text-muted">
             <tr>
               {COLUMNS.map((c) => {
                 const sortable = SORTABLE_COLUMN_IDS.has(c.id);
@@ -180,10 +201,7 @@ export function EnhancerTable() {
                 return (
                   <th
                     key={c.id}
-                    className={cn(
-                      "py-3 pr-4 font-medium select-none",
-                      c.align === "right" && "text-right",
-                    )}
+                    className="py-3 pr-4 font-medium select-none align-middle text-center"
                   >
                     {sortable ? (
                       <button
@@ -200,6 +218,28 @@ export function EnhancerTable() {
                     ) : (
                       <span>{c.header}</span>
                     )}
+                  </th>
+                );
+              })}
+            </tr>
+            <tr>
+              {COLUMNS.map((c) => {
+                const filterKey = COLUMN_FILTER_KEYS[c.id];
+                if (!filterKey) {
+                  return <th key={`${c.id}-filter`} className="pb-2 pr-4 align-middle" />;
+                }
+                return (
+                  <th key={`${c.id}-filter`} className="pb-2 pr-4 font-normal align-middle text-center">
+                    <input
+                      type="text"
+                      value={colFilters[c.id] ?? ""}
+                      onChange={(e) =>
+                        setColFilters((prev) => ({ ...prev, [c.id]: e.target.value }))
+                      }
+                      placeholder="Search…"
+                      aria-label={`Search ${c.header}`}
+                      className="w-full bg-cream border border-cream-border rounded-standard px-2 py-1 text-xs text-charcoal-82 placeholder:text-charcoal-40 focus:outline-none focus:border-charcoal-40 text-center"
+                    />
                   </th>
                 );
               })}
@@ -262,11 +302,11 @@ export function EnhancerTable() {
       </div>
 
       {data && (
-        <div className="mt-6 flex items-center justify-between text-sm">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
           <span className="text-muted tabular-nums">
             {data.total > 0 ? (
               <>
-                Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, data.total)} of{" "}
+                Showing {offset + 1}–{Math.min(offset + pageSize, data.total)} of{" "}
                 {data.total.toLocaleString()} enhancers
                 {isFetching && <span className="ml-2 text-charcoal-40">updating…</span>}
               </>
@@ -274,7 +314,21 @@ export function EnhancerTable() {
               "0 enhancers"
             )}
           </span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="inline-flex items-center gap-2 text-xs text-muted">
+              Rows per page
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value) as PageSize)}
+                className="bg-cream border border-cream-border rounded-standard px-2 py-1 text-xs text-charcoal focus:outline-none focus:border-charcoal-40"
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
               className="btn-ghost text-sm"

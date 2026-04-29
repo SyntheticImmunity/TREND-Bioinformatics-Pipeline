@@ -28,6 +28,43 @@ import { useLibraryFilter, type LibraryFilterKind } from "@/components/LibraryFi
 const RED_COVERED = "#E63946";
 const GREY_MISSING = "#D6D3CD";
 
+const TCGA_LONG_NAMES: Record<string, string> = {
+  ACC: "Adrenocortical Carcinoma",
+  BLCA: "Bladder Urothelial Carcinoma",
+  BRCA: "Breast Invasive Carcinoma",
+  CESC: "Cervical Squamous Cell Carcinoma & Endocervical Adenocarcinoma",
+  CHOL: "Cholangiocarcinoma",
+  COAD: "Colon Adenocarcinoma",
+  DLBC: "Diffuse Large B-cell Lymphoma",
+  ESAD: "Esophageal Adenocarcinoma",
+  ESSC: "Esophageal Squamous Cell Carcinoma",
+  GBM: "Glioblastoma Multiforme",
+  HNSC: "Head & Neck Squamous Cell Carcinoma",
+  KICH: "Kidney Chromophobe",
+  KIRC: "Kidney Renal Clear Cell Carcinoma",
+  KIRP: "Kidney Renal Papillary Cell Carcinoma",
+  LAML: "Acute Myeloid Leukemia",
+  LGG: "Brain Lower Grade Glioma",
+  LIHC: "Liver Hepatocellular Carcinoma",
+  LUAD: "Lung Adenocarcinoma",
+  LUSC: "Lung Squamous Cell Carcinoma",
+  MESO: "Mesothelioma",
+  OV: "Ovarian Serous Cystadenocarcinoma",
+  PAAD: "Pancreatic Adenocarcinoma",
+  PCPB: "Pheochromocytoma & Paraganglioma",
+  PRAD: "Prostate Adenocarcinoma",
+  READ: "Rectum Adenocarcinoma",
+  SARC: "Sarcoma",
+  SKCM: "Skin Cutaneous Melanoma",
+  STAD: "Stomach Adenocarcinoma",
+  TGCT: "Testicular Germ Cell Tumors",
+  THCA: "Thyroid Carcinoma",
+  THYM: "Thymoma",
+  UCEC: "Uterine Corpus Endometrial Carcinoma",
+  UCS: "Uterine Carcinosarcoma",
+  UVM: "Uveal Melanoma",
+};
+
 type CoverageRow = (CactsRow | DalessioRow) & { name: string };
 
 interface Props {
@@ -84,7 +121,7 @@ export function StackedCoverageBar({ variant }: Props) {
 
       <div style={{ width: "100%", height: 380 }}>
         <ResponsiveContainer>
-          <BarChart data={rows} margin={{ top: 28, right: 16, bottom: 80, left: 32 }}>
+          <BarChart data={rows} margin={{ top: 28, right: 16, bottom: 60, left: 32 }}>
             <CartesianGrid stroke="#eceae4" vertical={false} />
             <XAxis
               dataKey="name"
@@ -92,11 +129,29 @@ export function StackedCoverageBar({ variant }: Props) {
               angle={-45}
               textAnchor="end"
               height={70}
-              tick={{ fill: "#1c1c1c", fontSize: 10 }}
+              tick={({ x, y, payload }) => {
+                const code = String(payload.value);
+                const longName = isCacts ? TCGA_LONG_NAMES[code] : undefined;
+                return (
+                  <g transform={`translate(${x},${y})`}>
+                    <text
+                      transform="rotate(-45)"
+                      dy={4}
+                      textAnchor="end"
+                      fill="#1c1c1c"
+                      fontSize={10}
+                      style={{ cursor: longName ? "help" : "default" }}
+                    >
+                      {longName ? <title>{`${code} — ${longName}`}</title> : null}
+                      {code}
+                    </text>
+                  </g>
+                );
+              }}
               label={{
                 value: isCacts ? "TCGA tumor type" : "Anatomical system",
                 position: "insideBottom",
-                offset: -64,
+                offset: -42,
                 fill: "#5f5f5d",
                 fontSize: 12,
               }}
@@ -124,9 +179,15 @@ export function StackedCoverageBar({ variant }: Props) {
               content={({ active, payload }) => {
                 if (!active || !payload || !payload.length) return null;
                 const r = payload[0].payload as CoverageRow;
+                const longName = isCacts ? TCGA_LONG_NAMES[r.name] : undefined;
                 return (
                   <div className="rounded-comfortable border border-cream-border bg-cream-light px-3 py-2 text-xs text-charcoal-82 max-w-sm">
-                    <div className="font-semibold text-charcoal mb-1">{r.name}</div>
+                    <div className="font-semibold text-charcoal mb-1">
+                      {r.name}
+                      {longName && (
+                        <span className="font-normal text-charcoal-82"> · {longName}</span>
+                      )}
+                    </div>
                     <div>
                       In TREND:{" "}
                       <span className="font-semibold text-charcoal">
@@ -137,8 +198,7 @@ export function StackedCoverageBar({ variant }: Props) {
                       <div className="mt-1.5">
                         <div className="text-[10px] uppercase tracking-wide text-muted">Covered ({r.in_tfs.length})</div>
                         <div className="font-mono text-[10px] leading-snug break-all">
-                          {r.in_tfs.slice(0, 12).join(", ")}
-                          {r.in_tfs.length > 12 ? ` … +${r.in_tfs.length - 12} more` : ""}
+                          {r.in_tfs.join(", ")}
                         </div>
                       </div>
                     )}
@@ -146,8 +206,7 @@ export function StackedCoverageBar({ variant }: Props) {
                       <div className="mt-1.5">
                         <div className="text-[10px] uppercase tracking-wide text-muted">Missing ({r.missing_tfs.length})</div>
                         <div className="font-mono text-[10px] leading-snug break-all">
-                          {r.missing_tfs.slice(0, 12).join(", ")}
-                          {r.missing_tfs.length > 12 ? ` … +${r.missing_tfs.length - 12} more` : ""}
+                          {r.missing_tfs.join(", ")}
                         </div>
                       </div>
                     )}

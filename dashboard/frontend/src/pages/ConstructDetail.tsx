@@ -2,14 +2,33 @@ import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
-function MetadataRow({ k, v }: { k: string; v: unknown }) {
+function MetadataRow({ k, label, v }: { k: string; label?: string; v: unknown }) {
   if (v === null || v === undefined || v === "") return null;
   return (
     <div className="grid grid-cols-1 md:grid-cols-[14rem_1fr] gap-1 py-2 border-b border-cream-border last:border-0">
-      <dt className="text-xs text-muted font-mono">{k}</dt>
+      <dt
+        className={
+          label
+            ? "text-xs uppercase tracking-wide text-muted"
+            : "text-xs text-muted font-mono"
+        }
+      >
+        {label ?? k}
+      </dt>
       <dd className="text-sm text-charcoal-82 break-all">{String(v)}</dd>
     </div>
   );
+}
+
+// Low-signal columns we don't want surfaced in the condensed metadata view.
+// Match case-insensitively; prefixes cover all Lambert/Reddy/DNase variants.
+const ENHANCER_META_HIDDEN_PREFIXES = ["lambert_", "reddy_", "dnase_"];
+const ENHANCER_META_HIDDEN_KEYS = new Set(["tf_name_by_ppm"]);
+
+function isHiddenMetaKey(k: string): boolean {
+  const lc = k.toLowerCase();
+  if (ENHANCER_META_HIDDEN_KEYS.has(lc)) return true;
+  return ENHANCER_META_HIDDEN_PREFIXES.some((p) => lc.startsWith(p));
 }
 
 export default function ConstructDetail() {
@@ -31,11 +50,24 @@ export default function ConstructDetail() {
     enabled: !!id,
   });
 
-  // Project isolation: when the user drilled down from a specific project,
-  // only show that project's performance card.
-  const visibleProjects = fromProject
-    ? perf?.projects.filter((p) => p.project === fromProject) ?? []
-    : perf?.projects ?? [];
+  // Always show a single project's performance card. Preference order:
+  //   1. Project carried in the URL (?project=…) when the user drilled down
+  //      from a Results page.
+  //   2. Otherwise, the first project that has at least one non-null metric
+  //      for this construct (skips projects where it wasn't measured).
+  //   3. Fallback to the first project entry returned by the backend.
+  const visibleProjects = (() => {
+    const all = perf?.projects ?? [];
+    if (all.length === 0) return [];
+    if (fromProject) {
+      const match = all.find((p) => p.project === fromProject);
+      if (match) return [match];
+    }
+    const withData = all.find((p) =>
+      Object.values(p.metrics).some((v) => v !== null && v !== undefined),
+    );
+    return [withData ?? all[0]];
+  })();
 
   const backLabel = fromProject ? "← Back to results" : "← Back to library";
 
@@ -59,15 +91,15 @@ export default function ConstructDetail() {
 
       {perf && visibleProjects.length > 0 && (
         <section className="mt-12 card">
-          <h2 className="text-card-title font-semibold">
-            {fromProject ? "Performance" : "Performance across projects"}
-          </h2>
+          <h2 className="text-card-title font-semibold">Performance</h2>
           <p className="mt-1 text-sm text-muted">
-            {fromProject
-              ? `Activity readouts for this promoter in ${fromProject}.`
-              : "Activity readouts for this promoter in every TREND screen where it was measured."}
+            Activity readouts for this enhancer in{" "}
+            <span className="font-mono text-charcoal-82">
+              {visibleProjects[0]?.project}
+            </span>
+            .
           </p>
-          <div className={fromProject ? "mt-6" : "mt-6 grid gap-6 lg:grid-cols-2"}>
+          <div className="mt-6">
             {visibleProjects.map((p) => (
               <div
                 key={p.project}
@@ -89,14 +121,14 @@ export default function ConstructDetail() {
                 </div>
                 {p.by_ppm_name && (
                   <div className="mt-3 text-[11px] text-muted">
-                    PWM:{" "}
+                    PPM:{" "}
                     <Link
-                      to={`/results/pwm/${encodeURIComponent(p.by_ppm_name)}?project=${encodeURIComponent(p.project)}`}
+                      to={`/results/pwm/${encodeURIComponent(p.by_ppm_name)}?project=${encodeURIComponent(p.project)}${p.rank != null ? `&rank=${p.rank}` : ""}`}
                       className="font-mono text-charcoal-82 underline decoration-charcoal-40 underline-offset-2 hover:decoration-charcoal"
                     >
                       {p.by_ppm_name}
                     </Link>
-                    {p.rank !== null && <> · PWM rank {p.rank}</>}
+                    {p.rank !== null && <> · PPM rank {p.rank}</>}
                   </div>
                 )}
               </div>
@@ -106,33 +138,27 @@ export default function ConstructDetail() {
       )}
 
       {data && (
-        <div className="mt-8 grid gap-6 lg:grid-cols-2">
-          <section className="card">
-            <h2 className="text-card-title font-semibold">Construct metadata</h2>
-            <dl className="mt-4">
-              {Object.entries(data.construct).map(([k, v]) => (
-                <MetadataRow key={k} k={k} v={v} />
-              ))}
-            </dl>
-          </section>
-
-          <section className="card">
-            <h2 className="text-card-title font-semibold">Enhancer metadata</h2>
-            {data.metadata ? (
-              <dl className="mt-4">
-                {Object.entries(data.metadata).map(([k, v]) => (
-                  <MetadataRow key={k} k={k} v={v} />
-                ))}
-              </dl>
-            ) : (
-              <p className="mt-4 text-sm text-muted">
-                No matching row in <code className="font-mono">all_enhancer_metadata_111525.csv</code>{" "}
-                for this construct&apos;s <code className="font-mono">by_ppm_name</code> +{" "}
-                <code className="font-mono">rank</code>.
-              </p>
-            )}
-          </section>
-        </div>
+        <section className="mt-8 card">
+          <h2 className="text-card-title font-semibold">Enhancer metadata</h2>
+          <dl className="mt-4">
+            <MetadataRow
+              k="enhancer_name"
+              v={data.construct.promoter_name}
+            />
+            {data.metadata
+              ? Object.entries(data.metadata)
+                  .filter(([k]) => !isHiddenMetaKey(k))
+                  .map(([k, v]) => <MetadataRow key={k} k={k} v={v} />)
+              : null}
+          </dl>
+          {!data.metadata && (
+            <p className="mt-4 text-sm text-muted">
+              No matching row in <code className="font-mono">all_enhancer_metadata_111525.csv</code>{" "}
+              for this construct&apos;s <code className="font-mono">by_ppm_name</code> +{" "}
+              <code className="font-mono">rank</code>.
+            </p>
+          )}
+        </section>
       )}
     </div>
   );

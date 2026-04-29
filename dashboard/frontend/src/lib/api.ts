@@ -225,6 +225,11 @@ export const api = {
     dbd_family?: string;
     cacts_tumor?: string;
     dalessio_system?: string;
+    tf_contains?: string;
+    tfbs_contains?: string;
+    ppm_contains?: string;
+    vr_contains?: string;
+    dbd_contains?: string;
     sort_by?: EnhancerSortColumn;
     sort_dir?: "asc" | "desc";
     limit?: number;
@@ -238,6 +243,11 @@ export const api = {
     if (params.dbd_family) qs.set("dbd_family", params.dbd_family);
     if (params.cacts_tumor) qs.set("cacts_tumor", params.cacts_tumor);
     if (params.dalessio_system) qs.set("dalessio_system", params.dalessio_system);
+    if (params.tf_contains) qs.set("tf_contains", params.tf_contains);
+    if (params.tfbs_contains) qs.set("tfbs_contains", params.tfbs_contains);
+    if (params.ppm_contains) qs.set("ppm_contains", params.ppm_contains);
+    if (params.vr_contains) qs.set("vr_contains", params.vr_contains);
+    if (params.dbd_contains) qs.set("dbd_contains", params.dbd_contains);
     if (params.sort_by) qs.set("sort_by", params.sort_by);
     if (params.sort_dir) qs.set("sort_dir", params.sort_dir);
     if (params.limit !== undefined) qs.set("limit", String(params.limit));
@@ -295,6 +305,8 @@ export interface SelectivityPoint {
   tf: string;
   by_ppm_name: string;
   rank: number | null;
+  /** Designed TFBS sequence variant (from CSV TFBS_sequence column). */
+  tfbs_sequence: string | null;
   x: number;
   y: number;
   selectivity_ratio: number;
