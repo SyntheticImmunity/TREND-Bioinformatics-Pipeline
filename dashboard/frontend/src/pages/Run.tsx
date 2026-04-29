@@ -73,7 +73,8 @@ export default function Run() {
         The TREND pipeline takes raw sequencing reads through demultiplexing,
         barcode extraction, alignment to the Lib4 reference, and per-promoter
         enhancer-activity quantification. Run a simulation to preview the workflow,
-        or verify the bundled example for a full reproducibility check.
+        or run the install check to confirm this build reproduces our published
+        outputs before bringing your own data.
       </p>
 
       <div className="mt-8 flex flex-wrap gap-4 items-center">
@@ -85,7 +86,7 @@ export default function Run() {
           {running ? "Simulating…" : "Simulate a run"}
         </button>
         <Link to="/run/example" className="btn-ghost">
-          Verify the bundled example →
+          Run install check →
         </Link>
         {activeRunId && (
           <span className="text-xs text-muted font-mono">run id: {activeRunId}</span>

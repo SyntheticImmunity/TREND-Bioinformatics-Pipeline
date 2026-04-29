@@ -11,32 +11,26 @@ interface TierSpec {
   blurb: string;
   expectedRuntime: string;
   requirements: string;
+  recommended?: boolean;
 }
 
 const TIERS: TierSpec[] = [
   {
-    id: "smoke",
-    title: "Quick check",
+    id: "pipeline",
+    title: "End-to-end install check",
     blurb:
-      "Compares the bundled published activity tables against themselves. Confirms the dashboard's comparison machinery is wired up. No external tools required.",
-    expectedRuntime: "~1 second",
-    requirements: "Python only.",
+      "Runs the full pipeline (Steps 1–9) on simulated FASTQs and confirms the post-alignment count matrix matches the analytically-computed expected values. Validates the entire alignment + analysis stack inside your install: bowtie2, cutadapt, samtools, fastx-toolkit, and R. If this passes, you can trust the image on your own FASTQs.",
+    expectedRuntime: "~3 minutes",
+    requirements: "Full conda environment (everything is already bundled in the Docker image).",
+    recommended: true,
   },
   {
     id: "step9",
-    title: "Activity reproduction",
+    title: "Analysis-only check",
     blurb:
-      "Re-runs the unchanged Step-9 R script against a 1,000-promoter slice of the published ovarian cancer alignment data and verifies the output matches the published activity tables row-for-row.",
+      "Re-runs Step 9 (the R analysis script) on a 1,000-promoter slice of published OvCa alignment data and confirms the activity output matches our published table row-for-row. Use this if you only plan to re-analyze existing count tables — it skips the upstream alignment stack.",
     expectedRuntime: "~30 seconds",
     requirements: "R + tidyverse + Rsamtools.",
-  },
-  {
-    id: "pipeline",
-    title: "Full pipeline reproduction",
-    blurb:
-      "Runs Steps 1-9 end-to-end on simulated FASTQs (50 promoters x 5 barcodes, 8 samples) and verifies the post-alignment count matrix matches the analytically-computed expected counts.",
-    expectedRuntime: "~3 minutes",
-    requirements: "Conda environment (bowtie2, samtools, cutadapt, fastx-toolkit, R).",
   },
 ];
 
@@ -92,7 +86,7 @@ function ResultCard({ r }: { r: OracleFileResult }) {
 }
 
 export default function RunExample() {
-  const [tier, setTier] = useState<ExampleTier>("smoke");
+  const [tier, setTier] = useState<ExampleTier>("pipeline");
   const [report, setReport] = useState<OracleReport | null>(null);
   const mutation = useMutation({
     mutationFn: (chosenTier: ExampleTier) => api.runExample("ovarian_cancer", chosenTier),
@@ -104,15 +98,16 @@ export default function RunExample() {
   return (
     <div className="mx-auto max-w-[1200px] px-6 py-16">
       <h1 className="text-display-section font-semibold tracking-tight">
-        Verify the example
+        Install check
       </h1>
       <p className="mt-4 max-w-2xl text-muted">
-        Three tiers of reproducibility check, each comparing this environment&apos;s
-        outputs against the bundled reference. Pick a tier based on which tools
-        you have installed; results render below.
+        Confirm your install reproduces our published outputs before running on
+        your own data. The recommended check runs the full pipeline end-to-end
+        on a small simulated dataset; if it matches the expected outputs, your
+        install is good to go.
       </p>
 
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
+      <div className="mt-8 grid gap-4 md:grid-cols-2">
         {TIERS.map((t) => {
           const isActive = t.id === tier;
           return (
@@ -125,16 +120,18 @@ export default function RunExample() {
                 isActive ? "shadow-focus border-charcoal" : "hover:shadow-focus",
               )}
             >
-              <div className="flex items-baseline justify-between">
+              <div className="flex items-baseline justify-between gap-2">
                 <h3 className="text-card-title font-semibold">{t.title}</h3>
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide",
-                    isActive ? "bg-charcoal text-cream-light" : "bg-charcoal-3 text-muted",
-                  )}
-                >
-                  Tier {TIERS.indexOf(t) + 1}
-                </span>
+                {t.recommended && (
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide whitespace-nowrap",
+                      isActive ? "bg-charcoal text-cream-light" : "bg-charcoal-3 text-muted",
+                    )}
+                  >
+                    Recommended
+                  </span>
+                )}
               </div>
               <p className="mt-3 text-sm text-charcoal-82">{t.blurb}</p>
               <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-muted">
