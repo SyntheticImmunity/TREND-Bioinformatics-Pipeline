@@ -15,7 +15,7 @@ import Health from "@/pages/Health";
 const NAV: { to: string; label: string }[] = [
   { to: "/library", label: "Library" },
   { to: "/run", label: "Pipeline" },
-  { to: "/run/example", label: "Verify" },
+  { to: "/run/example", label: "Install check" },
   { to: "/results", label: "Results" },
   { to: "/project", label: "Projects" },
   { to: "/glossary", label: "Glossary" },

@@ -10,8 +10,8 @@ const ON_RAMPS = [
   },
   {
     to: "/run/example",
-    title: "Verify the example",
-    body: "Reproduce a published result end-to-end on the bundled reference dataset.",
+    title: "Validate your install",
+    body: "Confirm your Docker install reproduces our published outputs end-to-end. One-time check before running on your own data.",
   },
   {
     to: "/results",
