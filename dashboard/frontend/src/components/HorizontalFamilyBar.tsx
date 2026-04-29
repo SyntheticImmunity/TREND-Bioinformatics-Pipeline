@@ -76,9 +76,20 @@ export function HorizontalFamilyBar({ variant }: Props) {
           <YAxis
             type="category"
             dataKey="family"
-            width={210}
-            tick={{ fill: "#1c1c1c", fontSize: 11 }}
+            width={260}
             interval={0}
+            tick={({ x, y, payload }) => (
+              <text
+                x={x}
+                y={y}
+                dy={4}
+                textAnchor="end"
+                fill="#1c1c1c"
+                fontSize={11}
+              >
+                {payload.value}
+              </text>
+            )}
           />
           <Tooltip
             cursor={{ fill: "rgba(28,28,28,0.04)" }}

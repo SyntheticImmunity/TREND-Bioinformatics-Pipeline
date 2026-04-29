@@ -163,6 +163,11 @@ def list_enhancers(
     dbd_family: str | None = None,
     cacts_tumor: str | None = None,
     dalessio_system: str | None = None,
+    tf_contains: str | None = None,
+    tfbs_contains: str | None = None,
+    ppm_contains: str | None = None,
+    vr_contains: str | None = None,
+    dbd_contains: str | None = None,
     sort_by: str = "TF",
     sort_dir: str = "asc",
     limit: int = 100,
@@ -217,6 +222,21 @@ def list_enhancers(
             "by_ppm_name IN (SELECT by_ppm_name FROM enhancer_meta WHERE Lambert_DBD_family = ?)"
         )
         params.append(dbd_family)
+    if tf_contains:
+        where.append("TF LIKE ?")
+        params.append(f"%{tf_contains}%")
+    if tfbs_contains:
+        where.append("TFBS_sequence LIKE ?")
+        params.append(f"%{tfbs_contains}%")
+    if ppm_contains:
+        where.append("by_ppm_name LIKE ?")
+        params.append(f"%{ppm_contains}%")
+    if vr_contains:
+        where.append("variable_region LIKE ?")
+        params.append(f"%{vr_contains}%")
+    if dbd_contains:
+        where.append("Lambert_DBD_family LIKE ?")
+        params.append(f"%{dbd_contains}%")
     if cacts_tumor:
         eligible = _cacts_tumor_tfs(cacts_tumor)
         if eligible:

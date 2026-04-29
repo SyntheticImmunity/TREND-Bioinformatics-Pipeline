@@ -11,6 +11,12 @@ interface Props {
   project: string;
   /** Project metric label, e.g. "OV8/IOSE" for OvCa or "Stim/Rest" for T-cell. */
   title: string;
+  /**
+   * Fires whenever the in-table column filters change which rows are visible.
+   * Used by the parent strip plot to mirror the filter — non-matching red
+   * dots are hidden so the chart and table stay in sync as the user types.
+   */
+  onFilteredRowsChange?: (rows: SelectivityPoint[]) => void;
 }
 
 type SortCol =
@@ -35,6 +41,7 @@ interface ColumnDef {
   header: string;
   align?: "left" | "right";
   sortable: boolean;
+  filterable?: boolean;
   width?: string;
 }
 
@@ -64,13 +71,26 @@ function SortIndicator({ priority, dir }: { priority: number | null; dir: SortDi
   );
 }
 
-export function CancerSelectiveTable({ rows, project, title }: Props) {
-  const [tfSearch, setTfSearch] = useState("");
+export function CancerSelectiveTable({ rows, project, title, onFilteredRowsChange }: Props) {
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
   const [sorts, setSorts] = useState<Sort[]>([
     { col: "naturalRank", dir: "asc" },
   ]);
   const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_PAGE_SIZE);
   const [pageIndex, setPageIndex] = useState(0);
+
+  function setColumnFilter(col: string, value: string) {
+    setColumnFilters((prev) => ({ ...prev, [col]: value }));
+  }
+
+  function displayValueFor(row: RankedPoint, col: string): string {
+    if (col === "selectivity_ratio") return `${row.selectivity_ratio.toFixed(1)}×`;
+    if (col === "ov8_activity") return row.ov8_activity.toFixed(2);
+    if (col === "iose_activity")
+      return row.iose_activity != null ? row.iose_activity.toFixed(2) : "";
+    const v = row[col as keyof RankedPoint];
+    return v == null ? "" : String(v);
+  }
 
   const { data: pwmData } = useQuery({
     queryKey: ["pwms"],
@@ -82,19 +102,24 @@ export function CancerSelectiveTable({ rows, project, title }: Props) {
   // Project labels: "OV8/IOSE" -> ["OV8", "IOSE"]; "Stim/Rest" -> ["Stim", "Rest"]
   const [expLabel, ctrlLabel] = useMemo(() => {
     const parts = title.split("/");
-    return [parts[0] ?? "OVR", parts[1] ?? "IOSE"];
+    return [parts[0] ?? "OV8", parts[1] ?? "IOSE"];
   }, [title]);
 
+  const heading =
+    project === "T_cell_activation"
+      ? "Activation-inducible enhancers"
+      : "Cancer-selective enhancers";
+
   const COLUMNS: ColumnDef[] = useMemo(() => [
-    { id: "naturalRank", header: "Rank", sortable: true, align: "right", width: "56px" },
-    { id: "tf", header: "TF", sortable: true },
-    { id: "promoter_name", header: "Promoter", sortable: true },
-    { id: "by_ppm_name", header: "PWM", sortable: true, align: "left" },
-    { id: "logo", header: "Sequence logo", sortable: false, width: "150px" },
-    { id: "rank", header: "PWM rank", sortable: true, align: "right" },
+    { id: "naturalRank", header: "Rank", sortable: true, filterable: true, align: "right", width: "52px" },
+    { id: "tf", header: "TF", sortable: true, filterable: true },
+    { id: "promoter_name", header: "Enhancer", sortable: true, filterable: true },
+    { id: "by_ppm_name", header: "PPM", sortable: true, filterable: true, align: "left" },
+    { id: "logo", header: "Sequence Logo", sortable: false, width: "120px" },
+    { id: "rank", header: "PPM Rank", sortable: true, filterable: true, align: "right" },
+    { id: "ov8_activity", header: `${expLabel} Activity`, sortable: true, align: "right" },
+    { id: "iose_activity", header: `${ctrlLabel} Activity`, sortable: true, align: "right" },
     { id: "selectivity_ratio", header: `${expLabel}/${ctrlLabel}`, sortable: true, align: "right" },
-    { id: "ov8_activity", header: `${expLabel} activity`, sortable: true, align: "right" },
-    { id: "iose_activity", header: `${ctrlLabel} activity`, sortable: true, align: "right" },
   ], [expLabel, ctrlLabel]);
 
   // Assign a stable natural rank: 1 = highest selectivity_ratio in the dataset.
@@ -106,10 +131,14 @@ export function CancerSelectiveTable({ rows, project, title }: Props) {
   }, [rows]);
 
   const filtered = useMemo(() => {
-    const q = tfSearch.trim().toLowerCase();
-    if (!q) return ranked;
-    return ranked.filter((r) => r.tf.toLowerCase().includes(q));
-  }, [ranked, tfSearch]);
+    const active = Object.entries(columnFilters)
+      .map(([col, q]) => [col, q.trim().toLowerCase()] as const)
+      .filter(([, q]) => q !== "");
+    if (active.length === 0) return ranked;
+    return ranked.filter((r) =>
+      active.every(([col, q]) => displayValueFor(r, col).toLowerCase().includes(q)),
+    );
+  }, [ranked, columnFilters]);
 
   const sorted = useMemo(() => {
     if (sorts.length === 0) return filtered;
@@ -125,7 +154,14 @@ export function CancerSelectiveTable({ rows, project, title }: Props) {
   // Reset to first page whenever filters/sorts/page-size change.
   useEffect(() => {
     setPageIndex(0);
-  }, [tfSearch, sorts, pageSize, rows]);
+  }, [columnFilters, sorts, pageSize, rows]);
+
+  // Mirror the table's filtered set up to the parent so the strip plot can
+  // hide non-matching red dots in real time. Only `filtered` is propagated
+  // (not `sorted`), since chart visibility depends on filters, not sort order.
+  useEffect(() => {
+    onFilteredRowsChange?.(filtered);
+  }, [filtered, onFilteredRowsChange]);
 
   const totalRows = sorted.length;
   const effectivePageSize = pageSize === "all" ? totalRows || 1 : pageSize;
@@ -168,41 +204,17 @@ export function CancerSelectiveTable({ rows, project, title }: Props) {
     <div className="card border-cream-border">
       <div className="flex flex-wrap items-end gap-4">
         <div className="mr-auto">
-          <h4 className="text-card-title font-semibold text-charcoal">Cancer-selective enhancers</h4>
+          <h4 className="text-card-title font-semibold text-charcoal">{heading}</h4>
           <p className="mt-1 text-xs text-muted">
             {totalRows.toLocaleString()} of {rows.length.toLocaleString()} matches · click a header
-            to sort, shift+click to add a secondary sort
+            to sort, shift+click to add a secondary sort · type in any column header to filter
           </p>
-        </div>
-        <div className="flex flex-col">
-          <label htmlFor="tf-search" className="text-muted text-xs mb-1">
-            Filter by TF
-          </label>
-          <div className="relative">
-            <input
-              id="tf-search"
-              value={tfSearch}
-              onChange={(e) => setTfSearch(e.target.value)}
-              placeholder="e.g. SOX2, MYC"
-              className="w-64 bg-cream border border-cream-border rounded-standard pl-3 pr-9 py-1.5 text-sm focus:outline-none focus:border-charcoal-40"
-            />
-            {tfSearch && (
-              <button
-                type="button"
-                onClick={() => setTfSearch("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-charcoal text-sm"
-                aria-label="Clear TF filter"
-              >
-                ✕
-              </button>
-            )}
-          </div>
         </div>
       </div>
 
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead className="border-b border-cream-border text-xs uppercase tracking-wide text-muted bg-cream-light">
+      <div className="mt-4">
+        <table className="w-full text-left border-collapse table-fixed">
+          <thead className="border-b border-cream-border text-xs tracking-wide text-muted bg-cream">
             <tr>
               {COLUMNS.map((c) => {
                 const info = c.sortable ? sortInfo(c.id as SortCol) : { priority: null, dir: null };
@@ -210,17 +222,14 @@ export function CancerSelectiveTable({ rows, project, title }: Props) {
                   <th
                     key={c.id}
                     style={c.width ? { width: c.width } : undefined}
-                    className={cn(
-                      "py-2.5 px-3 font-medium select-none",
-                      c.align === "right" && "text-right",
-                    )}
+                    className="py-2.5 px-2 font-medium select-none align-middle text-center"
                   >
                     {c.sortable ? (
                       <button
                         type="button"
                         onClick={(ev) => handleHeaderClick(c.id as SortCol, ev)}
                         className={cn(
-                          "inline-flex items-center gap-1.5 transition-colors",
+                          "inline-flex items-center gap-1 transition-colors",
                           info.priority !== null
                             ? "text-charcoal"
                             : "text-muted hover:text-charcoal-82",
@@ -236,6 +245,38 @@ export function CancerSelectiveTable({ rows, project, title }: Props) {
                 );
               })}
             </tr>
+            <tr>
+              {COLUMNS.map((c) => {
+                if (c.filterable !== true) {
+                  return <th key={`${c.id}-filter`} className="pb-2.5 px-2" />;
+                }
+                const filterValue = columnFilters[c.id] ?? "";
+                return (
+                  <th key={`${c.id}-filter`} className="pb-2.5 px-2 font-normal text-center">
+                    <div className="relative w-full">
+                      <input
+                        type="text"
+                        value={filterValue}
+                        onChange={(e) => setColumnFilter(c.id, e.target.value)}
+                        placeholder="Search…"
+                        aria-label={`Search ${c.header}`}
+                        className="w-full bg-cream border border-transparent rounded-standard px-2 py-1 text-[11px] font-normal normal-case tracking-normal text-charcoal placeholder:text-charcoal-40 focus:outline-none focus:bg-cream-light focus:border-charcoal-40 text-center"
+                      />
+                      {filterValue && (
+                        <button
+                          type="button"
+                          onClick={() => setColumnFilter(c.id, "")}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 text-muted hover:text-charcoal text-[11px]"
+                          aria-label={`Clear ${c.header} filter`}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
+            </tr>
           </thead>
           <tbody>
             {visible.map((row, i) => {
@@ -245,26 +286,26 @@ export function CancerSelectiveTable({ rows, project, title }: Props) {
                   key={`${row.promoter_name}_${i}`}
                   className="border-b border-cream-border transition-colors hover:bg-charcoal-3"
                 >
-                  <td className="py-2 px-3 align-middle text-right tabular-nums text-xs text-muted">
+                  <td className="py-2 px-2 align-middle text-right tabular-nums text-xs text-charcoal">
                     {row.naturalRank}
                   </td>
-                  <td className="py-2 px-3 align-middle">
-                    <code className="font-mono text-xs">{row.tf || "—"}</code>
+                  <td className="py-2 px-2 align-middle">
+                    <code className="font-mono text-xs break-all">{row.tf || "—"}</code>
                   </td>
-                  <td className="py-2 px-3 align-middle text-left">
+                  <td className="py-2 px-2 align-middle text-left">
                     <Link
                       to={`/library/${encodeURIComponent(row.promoter_name)}?project=${encodeURIComponent(project)}`}
-                      className="font-mono text-xs text-charcoal underline decoration-charcoal-40 underline-offset-2 hover:decoration-charcoal"
+                      className="font-mono text-xs text-charcoal underline decoration-charcoal-40 underline-offset-2 hover:decoration-charcoal break-all"
                     >
                       {row.promoter_name}
                     </Link>
                   </td>
-                  <td className="py-2 px-3 align-middle text-left">
+                  <td className="py-2 px-2 align-middle text-left">
                     {row.by_ppm_name ? (
                       <Link
-                        to={`/results/pwm/${encodeURIComponent(row.by_ppm_name)}?project=${encodeURIComponent(project)}`}
-                        className="font-mono text-xs text-charcoal-82 underline decoration-charcoal-40 underline-offset-2 hover:decoration-charcoal hover:text-charcoal"
-                        title="Open PWM activity distribution"
+                        to={`/results/pwm/${encodeURIComponent(row.by_ppm_name)}?project=${encodeURIComponent(project)}${row.rank != null ? `&rank=${row.rank}` : ""}`}
+                        className="font-mono text-xs text-charcoal-82 underline decoration-charcoal-40 underline-offset-2 hover:decoration-charcoal hover:text-charcoal break-all"
+                        title="Open PPM activity distribution"
                       >
                         {row.by_ppm_name}
                       </Link>
@@ -272,24 +313,24 @@ export function CancerSelectiveTable({ rows, project, title }: Props) {
                       <span className="text-xs text-muted">—</span>
                     )}
                   </td>
-                  <td className="py-2 px-3 align-middle">
+                  <td className="py-2 px-2 align-middle">
                     {ppm ? (
-                      <SequenceLogo ppm={ppm} width={140} height={36} />
+                      <SequenceLogo ppm={ppm} width={110} height={32} />
                     ) : (
                       <span className="text-xs text-muted">—</span>
                     )}
                   </td>
-                  <td className="py-2 px-3 align-middle text-right tabular-nums text-xs">
+                  <td className="py-2 px-2 align-middle text-right tabular-nums text-xs">
                     {row.rank ?? "—"}
                   </td>
-                  <td className="py-2 px-3 align-middle text-right tabular-nums text-xs font-semibold">
-                    {row.selectivity_ratio.toFixed(1)}×
-                  </td>
-                  <td className="py-2 px-3 align-middle text-right tabular-nums text-xs">
+                  <td className="py-2 px-2 align-middle text-right tabular-nums text-xs">
                     {row.ov8_activity.toFixed(2)}
                   </td>
-                  <td className="py-2 px-3 align-middle text-right tabular-nums text-xs">
+                  <td className="py-2 px-2 align-middle text-right tabular-nums text-xs">
                     {row.iose_activity != null ? row.iose_activity.toFixed(2) : "—"}
+                  </td>
+                  <td className="py-2 px-2 align-middle text-right tabular-nums text-xs font-semibold">
+                    {row.selectivity_ratio.toFixed(1)}×
                   </td>
                 </tr>
               );
