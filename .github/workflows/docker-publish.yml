@@ -24,18 +24,30 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v4
 
-      - name: Download prebuilt library state into build context
+      - name: Download prebuilt library state and Lib4 reference into build context
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LIBRARY_RELEASE_TAG: library-data-2026-05-04
         run: |
+          # Dashboard library state (consumed by the FastAPI backend)
           mkdir -p dashboard/backend/state
           gh release download "$LIBRARY_RELEASE_TAG" \
             --repo "${{ github.repository }}" \
             --pattern 'library.sqlite' \
             --pattern 'library_summary.json' \
             --dir dashboard/backend/state
-          ls -lh dashboard/backend/state/
+
+          # Lib4 reference data (consumed by the Snakemake workflow when running
+          # the pipeline on a user's own FASTQs — bundled so the Docker image
+          # is fully self-contained, no download_data.sh required for adopters).
+          mkdir -p "codes/2. HPC_cluster_scripts/required_metadata"
+          gh release download "$LIBRARY_RELEASE_TAG" \
+            --repo "${{ github.repository }}" \
+            --pattern 'Lib4.fasta' \
+            --pattern 'Lib4_info_concise_060621.csv' \
+            --dir "codes/2. HPC_cluster_scripts/required_metadata"
+
+          ls -lh dashboard/backend/state/ "codes/2. HPC_cluster_scripts/required_metadata/"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

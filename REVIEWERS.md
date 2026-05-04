@@ -140,23 +140,11 @@ For reviewers who also wear the adopter hat. The detailed walkthrough is in **MA
 
 ### Prerequisites
 
-1. **The Lib4 reference data (~600 MB).** The bowtie2 alignment reference (`Lib4.fasta`) and per-construct metadata (`Lib4_info_concise_060621.csv`) exceed GitHub's 100 MB per-file limit and are hosted on Dropbox. One command fetches them and places each file at the path the pipeline expects:
+1. **A directory of demultiplexed `.fastq.gz` files** — one per sample. The pipeline auto-discovers samples from filenames: `OV8_DNA_r1.fastq.gz` becomes sample `OV8_DNA_r1`. Whatever naming convention you pick must match the `id` field in the sample sheet you'll edit below.
 
-   ```bash
-   # macOS / Linux
-   bash scripts/download_data.sh
+2. **The runtime.** If you used the Docker image in § B.2, you already have everything — the Lib4 alignment reference (`Lib4.fasta`) and per-construct metadata (`Lib4_info_concise_060621.csv`) are baked into the image. No additional downloads needed.
 
-   # Windows (PowerShell)
-   pwsh scripts/download_data.ps1
-   ```
-
-   The script downloads ~3 GB total (the Lib4 reference plus the published alignment count tables — the latter aren't needed for `trend run` on your own data, but they let you re-run Step 9 against the full published OvCa data if you want). It's idempotent; safe to re-run, skips files already present.
-
-   *The Docker image you pulled in § B.2 bakes in the dashboard's much smaller `library.sqlite` (892 MB) but not the FASTA reference — you still need this download to run the pipeline on your own FASTQs.*
-
-2. **A directory of demultiplexed `.fastq.gz` files** — one per sample. The pipeline auto-discovers samples from filenames: `OV8_DNA_r1.fastq.gz` becomes sample `OV8_DNA_r1`. Whatever naming convention you pick must match the `id` field in the sample sheet you'll edit below.
-
-3. **The runtime.** Either the Docker image (recommended; everything is bundled) or a local conda env (`conda env create -f pipeline/environment.yml; conda activate trend; pip install -e ./pipeline`).
+   If you'd rather use a local conda env: `conda env create -f pipeline/environment.yml; conda activate trend; pip install -e ./pipeline`. Then run `bash scripts/download_data.sh` (macOS/Linux) or `pwsh scripts/download_data.ps1` (Windows) to fetch the Lib4 reference from Dropbox into `codes/2. HPC_cluster_scripts/required_metadata/`. The script is idempotent.
 
 ### Step 1 — Scaffold the project
 
@@ -192,19 +180,18 @@ conda activate trend
 trend run --inputs ./fastqs/ --output runs/$(date +%F)/
 ```
 
-**Docker (if you'd rather not install anything beyond Docker):**
+**Docker (recommended — nothing else to install):**
 
 ```bash
 docker run --rm \
   -v "$(pwd)/fastqs:/data/fastqs" \
   -v "$(pwd)/runs:/data/runs" \
-  -v "$(pwd)/codes/2. HPC_cluster_scripts/required_metadata:/app/codes/2. HPC_cluster_scripts/required_metadata" \
   -v "$(pwd)/my-experiment:/app/my-experiment" \
   ghcr.io/syntheticimmunity/trend-dashboard:latest \
   trend run --inputs /data/fastqs --output /data/runs/$(date +%F)/
 ```
 
-The four `-v` mounts make four host directories visible inside the container: your FASTQs (read-only input), the runs output dir (where outputs get written), the Lib4 reference you just downloaded, and the project scaffold from step 1.
+The three `-v` mounts expose three host directories inside the container: your FASTQs (read-only input), the runs output dir (where outputs get written), and the project scaffold from step 1. The Lib4 reference is already inside the image.
 
 The runner streams per-step progress. A 16-sample run on a workstation with 8 cores typically takes hours-to-overnight depending on read depth.
 

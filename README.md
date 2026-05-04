@@ -32,13 +32,12 @@ docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
 
 The image bundles bowtie2, samtools, cutadapt, fastx-toolkit, R + tidyverse + Rsamtools, Python, all dependencies, and the pre-built dashboard frontend. ~5 min from clean machine to running dashboard.
 
-The same image runs your own data — mount your FASTQs, output dir, the Lib4 reference (downloaded in the next section), and your project scaffold; then override the default command:
+The same image runs your own data — mount your FASTQs, output dir, and your project scaffold; then override the default command. The Lib4 alignment reference is already in the image, so no separate download is needed:
 
 ```bash
 docker run --rm \
   -v /path/to/fastqs:/data/fastqs \
   -v /path/to/runs:/data/runs \
-  -v "$(pwd)/codes/2. HPC_cluster_scripts/required_metadata:/app/codes/2. HPC_cluster_scripts/required_metadata" \
   -v "$(pwd)/my-experiment:/app/my-experiment" \
   ghcr.io/syntheticimmunity/trend-dashboard:latest \
   trend run --inputs /data/fastqs --output /data/runs/$(date +%F)
@@ -66,9 +65,11 @@ trend preflight    # verify every required tool is installed
 
 See [`MANUAL.md`](MANUAL.md) § 3 for OS-specific commands to install bowtie2, samtools, cutadapt, fastx-toolkit, and R + tidyverse + Rsamtools system-wide, then `pip install -e ./pipeline`.
 
-### Get the Lib4 reference data (one-time)
+### Get the Lib4 reference data (Path B / Path C only)
 
-The bowtie2 alignment reference (`Lib4.fasta`) and per-construct metadata (`Lib4_info_concise_060621.csv`) exceed GitHub's per-file size limit and live on Dropbox. One command pulls them and places each file at the path the pipeline expects:
+The Docker image (Path A) already bakes in the Lib4 alignment reference, so Path A users can skip this step.
+
+For Path B (Conda) and Path C (Manual) installs, the bowtie2 alignment reference (`Lib4.fasta`) and per-construct metadata (`Lib4_info_concise_060621.csv`) exceed GitHub's per-file size limit and live on Dropbox. One command pulls them and places each file at the path the pipeline expects:
 
 ```bash
 # macOS / Linux
