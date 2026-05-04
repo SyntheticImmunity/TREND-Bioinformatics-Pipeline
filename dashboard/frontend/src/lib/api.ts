@@ -421,7 +421,10 @@ export async function startRun(
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
-    buf += decoder.decode(value, { stream: true });
+    // sse-starlette emits CRLF line endings; the SSE frame-separator we
+    // look for below is the spec-standard "\n\n", which won't match the
+    // CRLF "\r\n\r\n" in raw form. Strip CRs so the parsing works.
+    buf += decoder.decode(value, { stream: true }).replace(/\r/g, "");
     let idx: number;
     while ((idx = buf.indexOf("\n\n")) >= 0) {
       const block = buf.slice(0, idx);
