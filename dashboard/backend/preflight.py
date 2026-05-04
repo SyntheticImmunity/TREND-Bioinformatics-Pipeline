@@ -104,12 +104,16 @@ _INSTALL_HINTS = {
 }
 
 
+# (install_name, import_name, purpose) — install_name is what `pip install`
+# expects and what the user sees in the UI; import_name is what the package
+# actually exposes at the Python module level. The two diverge for biopython
+# (installed as `biopython`, imported as `Bio`).
 _PYTHON_PACKAGES = [
-    ("biopython", "Demultiplexing + FASTQ parsing in Steps 1-3."),
-    ("pandas", "Step 1 sample-barcode CSV processing."),
-    ("numpy", "Comparator and aggregations."),
-    ("duckdb", "Library SQLite ingest."),
-    ("fastapi", "Backend HTTP server."),
+    ("biopython", "Bio", "Demultiplexing + FASTQ parsing in Steps 1-3."),
+    ("pandas", "pandas", "Step 1 sample-barcode CSV processing."),
+    ("numpy", "numpy", "Comparator and aggregations."),
+    ("duckdb", "duckdb", "Library SQLite ingest."),
+    ("fastapi", "fastapi", "Backend HTTP server."),
 ]
 
 
@@ -216,16 +220,16 @@ def run_preflight(force: bool = False) -> PreflightReport:
             )
         )
 
-    for pkg, purpose in _PYTHON_PACKAGES:
-        found, version = _probe_python_pkg(pkg)
+    for install_name, import_name, purpose in _PYTHON_PACKAGES:
+        found, version = _probe_python_pkg(import_name)
         severity = "info" if found else "warning"
         if not found:
             n_warnings += 1
         report.checks.append(
             CheckResult(
-                name=pkg, category="python_package", found=found, version=version,
+                name=install_name, category="python_package", found=found, version=version,
                 purpose=purpose,
-                hint="" if found else f"pip install {pkg}",
+                hint="" if found else f"pip install {install_name}",
                 severity=severity,
             )
         )
