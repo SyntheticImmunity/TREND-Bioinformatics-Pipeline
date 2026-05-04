@@ -103,7 +103,7 @@ docker pull ghcr.io/syntheticimmunity/trend-dashboard:latest
 docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
 ```
 
-The first command downloads the image (~2 GB; runs once, cached afterwards). The second starts the container and prints `Uvicorn running on http://0.0.0.0:8000` when ready. Leave the terminal window open — closing it stops the container. To stop the container manually, return to the terminal and press `Ctrl+C`.
+The first command downloads the image (~1.3 GB compressed transfer; expands to ~6 GB on disk after extraction — the conda environment with R, bowtie2, samtools, cutadapt, fastx-toolkit and the prebuilt library state accounts for most of it). The pull runs once and is cached afterwards. The second command starts the container and prints `Uvicorn running on http://0.0.0.0:8000` when ready. Leave the terminal window open — closing it stops the container. To stop the container manually, return to the terminal and press `Ctrl+C`.
 
 Open **http://localhost:8000** in your browser.
 
