@@ -163,8 +163,6 @@ The dashboard's `/run/example` page exposes the same tiers as click-to-run butto
 | [`README.md`](README.md) | Everyone — first impression | This file |
 | [`REVIEWERS.md`](REVIEWERS.md) | Journal reviewers | ~10 min read; ships a 5-min Mode A path and a 30-min Mode B path |
 | [`MANUAL.md`](MANUAL.md) | New users / adopters | Comprehensive install, dashboard tour, troubleshooting, glossary |
-| [`DASHBOARD_PRD.md`](DASHBOARD_PRD.md) | Engineers extending the platform | Full product requirements |
-| [`DESIGN.md`](DESIGN.md) | UI contributors | Visual design system spec |
 | [`references/TREND_library_TF_breakdown.md`](references/TREND_library_TF_breakdown.md) | Reviewers + curious adopters | Reconciliation of the 1,068 / 729 / 695 / 49 numbers against Lambert |
 | [`CHANGELOG.md`](CHANGELOG.md) | Anyone tracking releases | Release notes per version |
 
