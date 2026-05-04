@@ -566,13 +566,25 @@ def results_selectivity_scatter(
 
 @app.get("/results/projects")
 def results_projects() -> dict:
-    """Enumerate the projects with bundled published results."""
+    """Enumerate the projects with bundled published results.
+
+    Order follows _SELECTIVITY_PROJECTS (the canonical project ordering used
+    by the strip-plot and selective-table endpoints), then any disk-only
+    projects alphabetically. Defining the default this way avoids letting
+    ASCII-sort make uppercase project names land before lowercase ones.
+    """
     base = config.PROJECT_DATA_ROOT / "final_enhancer_activity_results"
-    projects = []
-    if base.exists():
-        for d in sorted(p for p in base.iterdir() if p.is_dir()):
-            files = sorted(p.name for p in d.glob("*.csv"))
-            projects.append({"name": d.name, "files": files})
+    projects: list[dict] = []
+    if not base.exists():
+        return {"projects": projects}
+
+    on_disk = {p.name: p for p in base.iterdir() if p.is_dir()}
+    for name in _SELECTIVITY_PROJECTS:
+        d = on_disk.pop(name, None)
+        if d is not None:
+            projects.append({"name": d.name, "files": sorted(p.name for p in d.glob("*.csv"))})
+    for d in sorted(on_disk.values(), key=lambda p: p.name):
+        projects.append({"name": d.name, "files": sorted(p.name for p in d.glob("*.csv"))})
     return {"projects": projects}
 
 
