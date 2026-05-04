@@ -86,9 +86,9 @@ cd TREND-Bioinformatics-Pipeline
 
 The fastest way to run the platform is the bundled Docker image. It includes bowtie2, samtools, cutadapt, fastx-toolkit, R and all R packages, Python, and the pre-built dashboard frontend — nothing else needs to be installed.
 
-**Prerequisites:** Docker Desktop (https://docker.com/products/docker-desktop). One-click install on Mac and Windows.
+**Prerequisites:** Docker Desktop (https://docker.com/products/docker-desktop). One-click install on macOS.
 
-> **Windows note:** if the installer reports `For security reasons C:\ProgramData\DockerDesktop must be owned by an elevated account`, right-click the installer and choose **Run as administrator**.
+> **Windows:** right-click the downloaded installer and choose **Run as administrator** before the first install. Docker Desktop writes into protected system directories during setup, and the standard double-click path will fail with `For security reasons C:\ProgramData\DockerDesktop must be owned by an elevated account`. Installing as administrator from the start avoids the error.
 
 **After installing, launch Docker Desktop and wait for it to be ready.** Installing the application is not the same as running it — the `docker` commands below talk to a background service that only starts when the app is open. Look for the whale icon in the Windows system tray (bottom-right) or the macOS menu bar (top-right): when the icon is solid and stops animating, the service is up. Until then, `docker pull` will fail with `error during connect: ... pipe/docker_engine` (Windows) or `Cannot connect to the Docker daemon` (macOS / Linux).
 

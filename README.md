@@ -10,8 +10,6 @@ The GitHub repository is private during the manuscript review period; this anony
 
 For an organized walkthrough of what is in the repository — source files, manuscript numbers and where they appear, bundled reproducibility examples, and the Docker-based local run path — read [`REVIEWERS.md`](REVIEWERS.md). It comes in two parts: Part A describes what is in the repository and runs in 5–10 minutes of browsing; Part B walks through a Docker install and two bundled reproducibility checks (the longer finishes in ~3 minutes on a standard laptop). No HPC cluster is required for either part.
 
-The numbers cited in the manuscript (e.g., *204/273 = 74.7% CaCTS coverage*, *11,283 Homeodomain sensors*, *top OvCa hit `ATTTTCCCGCCA_E2F7` at 26.6× selectivity*) appear in the source files directly; REVIEWERS.md § A.2 maps each to its location.
-
 ---
 
 ## 🧬 For new users running TREND on your own data
