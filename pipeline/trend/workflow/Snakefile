@@ -121,9 +121,13 @@ rule flip_orientation:
     shell:
         # The script takes the input FASTQ as argv[1] and writes flipped_<input>
         # into its working directory. We run in intermediate/ so the output
-        # lands where the rest of the pipeline expects.
+        # lands where the rest of the pipeline expects. Transparently
+        # decompress .fastq.gz inputs since the script opens its input as text.
         """
-        cp {input.fastq} intermediate/{wildcards.sample}.fastq
+        case "{input.fastq}" in
+            *.gz) gunzip -c "{input.fastq}" > intermediate/{wildcards.sample}.fastq ;;
+            *)    cp "{input.fastq}" intermediate/{wildcards.sample}.fastq ;;
+        esac
         cd intermediate && python "{PYSCRIPTS}/correct_read_orientation_for_Lib4_mbcf.py" {wildcards.sample}.fastq > ../{log} 2>&1
         rm -f intermediate/{wildcards.sample}.fastq
         """

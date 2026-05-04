@@ -45,6 +45,7 @@ dependencies:
   # R + R packages (Steps 8 and 9)
   - r-base>=4.2
   - r-tidyverse
+  - r-gridextra
   - r-data.table
   - bioconductor-rsamtools
 

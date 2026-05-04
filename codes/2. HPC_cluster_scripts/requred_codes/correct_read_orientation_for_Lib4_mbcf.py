@@ -71,8 +71,7 @@ import os
 from Bio.Seq import Seq
 import time
 from sys import argv
-working_dir = '/n/scratch3/users/m/mw277/SP035/' # need to change accordingly
-os.chdir(working_dir)
+working_dir = ''  # operate in the current working directory
 input_file = argv[1]
 output_fastq = open('flipped_' + input_file, 'a+')
 

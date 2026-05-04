@@ -30,7 +30,7 @@ const TIERS: TierSpec[] = [
     blurb:
       "Re-runs Step 9 (the R analysis script) on a 1,000-promoter slice of published OvCa alignment data and confirms the activity output matches our published table row-for-row. Use this if you only plan to re-analyze existing count tables — it skips the upstream alignment stack.",
     expectedRuntime: "~30 seconds",
-    requirements: "R + tidyverse + Rsamtools.",
+    requirements: "R + tidyverse + gridExtra.",
   },
 ];
 
