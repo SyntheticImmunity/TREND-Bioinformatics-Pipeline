@@ -343,7 +343,59 @@ The runner streams per-step progress. On a workstation with 8 cores, a typical 1
 trend dashboard --runs runs/
 ```
 
-Open `http://localhost:8000` — the new run appears in `/run/history`, and your activity table is browsable on the Results page with the same column tooltips and selectivity scatter as the bundled projects.
+Open `http://localhost:8000` — the new run appears in `/run/history`. To also surface your activity table on the **Results** page (with the strip plot, sortable selective-enhancer table, drill-down to PWM and construct pages, and CSV download — the same machinery the bundled OvCa and T-cell projects use), see the next step.
+
+### Step 4a: Visualize your own results in the dashboard
+
+The Results page is project-agnostic. Two pieces are needed: a CSV with the right shape, and a one-block config entry that points the dashboard at it. After that, the page works the same as for the bundled projects — sequence logos, sort/filter, drill-downs, and CSV download all come for free.
+
+**1. Drop your CSV at the expected path**
+
+```
+data/final_enhancer_activity_results/<your_project_name>/<your_file>.csv
+```
+
+**2. Required columns**
+
+The CSV must contain the columns below. Names marked *configurable* are mapped via the config entry in step 3 — they don't have to match the OvCa names; you tell the dashboard what your column is called.
+
+| Column | Type | Required? | Notes |
+|---|---|---|---|
+| `promoter_name` | string | yes | Must match a `promoter_name` in the bundled `library.sqlite`. Drives the construct drill-down. |
+| `by_ppm_name` | string | yes | PPM identifier — drives the sequence-logo display and the PWM drill-down. Tab-separated and `_v\d+` suffix forms are tolerated. |
+| `rank` | int | yes | Rank of this enhancer within the PPM (smaller = better-scoring). |
+| (experimental activity) | float | yes (configurable) | Per-promoter activity in your experimental condition. e.g. `stim_activity`. |
+| (control activity) | float | yes (configurable) | Per-promoter activity in your control condition. e.g. `rest_activity`. |
+| (selectivity ratio) | float | yes (configurable) | Experimental / control ratio (in linear or log space — the dashboard plots it as-is on a log2 axis). |
+| (TF name) | string | yes (configurable) | The per-row TF label shown in the table. |
+
+Any additional columns are silently ignored.
+
+**3. Add a config entry**
+
+Append a block to `_SELECTIVITY_PROJECTS` in `dashboard/backend/main.py`:
+
+```python
+"my_project": {
+    "csv": "my_activity_table.csv",     # filename inside the project folder
+    "exp_col": "stim_activity",         # your experimental-condition column
+    "ctrl_col": "rest_activity",        # your control-condition column
+    "ratio_col": "stim_over_rest",      # your selectivity-ratio column
+    "tf_col": "tf_name",                # your TF-name column
+    "title": "Stim/Rest",               # drives column headers in the table:
+                                        # "Stim Activity", "Rest Activity", "Stim/Rest"
+},
+```
+
+Restart the dashboard backend (`trend dashboard` or the bare `uvicorn` command in §3 Path C). Your project appears in the Results page's project dropdown automatically.
+
+**What you get for free**
+
+- Strip plot of every enhancer (log2 ratio vs. log10 experimental activity), with selective enhancers highlighted.
+- Sortable, filterable selective-enhancer table — click a header to sort, shift+click for secondary sort, type in any column to filter.
+- Drill-down from any row to a per-construct page (with cross-project performance comparison) and to a per-PWM page (with sequence logo and activity histogram).
+- Download CSV button that exports the currently filtered, sorted set.
+- Project-aware column labels everywhere ("Stim Activity" instead of the OvCa "OV8 Activity", etc.) — driven entirely by your `title` value.
 
 ### Step 5: Share with collaborators
 
