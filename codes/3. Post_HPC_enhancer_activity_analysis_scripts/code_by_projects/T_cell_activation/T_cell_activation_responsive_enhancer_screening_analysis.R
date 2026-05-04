@@ -6,7 +6,7 @@ library(tidyverse)
 library(gridExtra)
 library(data.table)
 
-setwd("E:/TREND_test_run_final_codes/final_T_cell_activation_code") # need to change to your working directory
+# Inputs and outputs are read from / written to the current working directory.
 
 ## ---- B1. Read preprocessed count matrices (unnormalized & normalized) ----
 ## Unnormalized and library-size–normalized read count tables were generated

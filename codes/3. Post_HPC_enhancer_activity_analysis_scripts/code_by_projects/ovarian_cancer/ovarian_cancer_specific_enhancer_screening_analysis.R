@@ -5,7 +5,7 @@ library(gridExtra)
 ## Paths & input
 ## ------------------------------------------------------------------
 
-setwd("E:/TREND_test_run_final_codes/ovca_NCNM_final")  # adjust as needed
+# Inputs and outputs are read from / written to the current working directory.
 
 # Unnormalized result (used only for column structure)
 un_normalized_result <- read.csv(
