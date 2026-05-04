@@ -154,6 +154,92 @@ ENHANCER_SORT_COLUMNS: dict[str, str] = {
 }
 
 
+def _build_enhancer_filters(
+    *,
+    q: str | None,
+    tf: str | None,
+    tfbs_prefix: str | None,
+    by_ppm_name: str | None,
+    dbd_family: str | None,
+    cacts_tumor: str | None,
+    dalessio_system: str | None,
+    tf_contains: str | None,
+    tfbs_contains: str | None,
+    ppm_contains: str | None,
+    vr_contains: str | None,
+    dbd_contains: str | None,
+) -> tuple[str, list[object]]:
+    where: list[str] = []
+    params: list[object] = []
+    if q:
+        like = f"%{q}%"
+        where.append(
+            "(TF LIKE ? OR TFBS_sequence LIKE ? OR by_ppm_name LIKE ? OR variable_region LIKE ?)"
+        )
+        params.extend([like, like, like, like])
+    if tf:
+        where.append("TF = ?")
+        params.append(tf)
+    if tfbs_prefix:
+        where.append("TFBS_sequence LIKE ?")
+        params.append(f"{tfbs_prefix}%")
+    if by_ppm_name:
+        where.append("by_ppm_name = ?")
+        params.append(by_ppm_name)
+    # The classification filters require subselects — we do not denormalize the
+    # CaCTS / D'Alessio mappings into the enhancers table, since those mappings
+    # change as upstream studies evolve. Subselects against the summary JSON
+    # would be expensive; instead we resolve them via a small in-memory list of
+    # eligible TFs derived from the summary at request time.
+    if dbd_family:
+        where.append(
+            "by_ppm_name IN (SELECT by_ppm_name FROM enhancer_meta WHERE Lambert_DBD_family = ?)"
+        )
+        params.append(dbd_family)
+    if tf_contains:
+        where.append("TF LIKE ?")
+        params.append(f"%{tf_contains}%")
+    if tfbs_contains:
+        where.append("TFBS_sequence LIKE ?")
+        params.append(f"%{tfbs_contains}%")
+    if ppm_contains:
+        where.append("by_ppm_name LIKE ?")
+        params.append(f"%{ppm_contains}%")
+    if vr_contains:
+        where.append("variable_region LIKE ?")
+        params.append(f"%{vr_contains}%")
+    if dbd_contains:
+        where.append("Lambert_DBD_family LIKE ?")
+        params.append(f"%{dbd_contains}%")
+    if cacts_tumor:
+        eligible = _cacts_tumor_tfs(cacts_tumor)
+        if eligible:
+            placeholders = ",".join("?" * len(eligible))
+            where.append(f"UPPER(TF) IN ({placeholders})")
+            params.extend(eligible)
+        else:
+            where.append("0=1")
+    if dalessio_system:
+        eligible = _dalessio_system_tfs(dalessio_system)
+        if eligible:
+            placeholders = ",".join("?" * len(eligible))
+            where.append(f"UPPER(TF) IN ({placeholders})")
+            params.extend(eligible)
+        else:
+            where.append("0=1")
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    return where_sql, params
+
+
+def _enhancer_order_sql(sort_by: str, sort_dir: str) -> str:
+    sort_expr = ENHANCER_SORT_COLUMNS.get(sort_by, "TF")
+    sort_dir_sql = "DESC" if (sort_dir or "").lower() == "desc" else "ASC"
+    # Always include a deterministic secondary sort for stable pagination.
+    # rank is the immediate secondary so a "sort by TF" naturally groups
+    # rank 1, 2, 3 within each TF before falling back to TFBS / PPM tiebreakers.
+    return f"ORDER BY {sort_expr} {sort_dir_sql}, TF ASC, rank ASC, TFBS_sequence ASC, by_ppm_name ASC"
+
+
 def list_enhancers(
     *,
     q: str | None = None,
@@ -191,74 +277,13 @@ def list_enhancers(
     limit = max(1, min(limit, 1000))
     offset = max(0, offset)
 
-    sort_expr = ENHANCER_SORT_COLUMNS.get(sort_by, "TF")
-    sort_dir_sql = "DESC" if (sort_dir or "").lower() == "desc" else "ASC"
-
-    where: list[str] = []
-    params: list[object] = []
-    if q:
-        like = f"%{q}%"
-        where.append(
-            "(TF LIKE ? OR TFBS_sequence LIKE ? OR by_ppm_name LIKE ? OR variable_region LIKE ?)"
-        )
-        params.extend([like, like, like, like])
-    if tf:
-        where.append("TF = ?")
-        params.append(tf)
-    if tfbs_prefix:
-        where.append("TFBS_sequence LIKE ?")
-        params.append(f"{tfbs_prefix}%")
-    if by_ppm_name:
-        where.append("by_ppm_name = ?")
-        params.append(by_ppm_name)
-    # The classification filters require subselects — we do not denormalize the
-    # CaCTS / D'Alessio mappings into the enhancers table, since those mappings
-    # change as upstream studies evolve. Subselects against the summary JSON
-    # would be expensive; instead we resolve them via a small in-memory list of
-    # eligible TFs derived from the summary at request time.
-    if dbd_family:
-        # Map enhancer rows to DBD family via enhancer_meta join.
-        where.append(
-            "by_ppm_name IN (SELECT by_ppm_name FROM enhancer_meta WHERE Lambert_DBD_family = ?)"
-        )
-        params.append(dbd_family)
-    if tf_contains:
-        where.append("TF LIKE ?")
-        params.append(f"%{tf_contains}%")
-    if tfbs_contains:
-        where.append("TFBS_sequence LIKE ?")
-        params.append(f"%{tfbs_contains}%")
-    if ppm_contains:
-        where.append("by_ppm_name LIKE ?")
-        params.append(f"%{ppm_contains}%")
-    if vr_contains:
-        where.append("variable_region LIKE ?")
-        params.append(f"%{vr_contains}%")
-    if dbd_contains:
-        where.append("Lambert_DBD_family LIKE ?")
-        params.append(f"%{dbd_contains}%")
-    if cacts_tumor:
-        eligible = _cacts_tumor_tfs(cacts_tumor)
-        if eligible:
-            placeholders = ",".join("?" * len(eligible))
-            where.append(f"UPPER(TF) IN ({placeholders})")
-            params.extend(eligible)
-        else:
-            where.append("0=1")
-    if dalessio_system:
-        eligible = _dalessio_system_tfs(dalessio_system)
-        if eligible:
-            placeholders = ",".join("?" * len(eligible))
-            where.append(f"UPPER(TF) IN ({placeholders})")
-            params.extend(eligible)
-        else:
-            where.append("0=1")
-    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
-
-    # Always include a deterministic secondary sort for stable pagination.
-    # rank is the immediate secondary so a "sort by TF" naturally groups
-    # rank 1, 2, 3 within each TF before falling back to TFBS / PPM tiebreakers.
-    order_sql = f"ORDER BY {sort_expr} {sort_dir_sql}, TF ASC, rank ASC, TFBS_sequence ASC, by_ppm_name ASC"
+    where_sql, params = _build_enhancer_filters(
+        q=q, tf=tf, tfbs_prefix=tfbs_prefix, by_ppm_name=by_ppm_name,
+        dbd_family=dbd_family, cacts_tumor=cacts_tumor, dalessio_system=dalessio_system,
+        tf_contains=tf_contains, tfbs_contains=tfbs_contains, ppm_contains=ppm_contains,
+        vr_contains=vr_contains, dbd_contains=dbd_contains,
+    )
+    order_sql = _enhancer_order_sql(sort_by, sort_dir)
 
     with _connect(db_path) as con:
         total = con.execute(
@@ -283,6 +308,51 @@ def list_enhancers(
         offset=offset,
         limit=limit,
     )
+
+
+def iter_enhancers_for_export(
+    *,
+    q: str | None = None,
+    tf: str | None = None,
+    tfbs_prefix: str | None = None,
+    by_ppm_name: str | None = None,
+    dbd_family: str | None = None,
+    cacts_tumor: str | None = None,
+    dalessio_system: str | None = None,
+    tf_contains: str | None = None,
+    tfbs_contains: str | None = None,
+    ppm_contains: str | None = None,
+    vr_contains: str | None = None,
+    dbd_contains: str | None = None,
+    sort_by: str = "TF",
+    sort_dir: str = "asc",
+    db_path: Path = config.LIBRARY_DB,
+):
+    """Yield every enhancer row matching the same filters as list_enhancers,
+    in the same sort order, with no pagination cap. Used by the CSV export
+    endpoint so a download captures the full filtered set, not just a page."""
+    where_sql, params = _build_enhancer_filters(
+        q=q, tf=tf, tfbs_prefix=tfbs_prefix, by_ppm_name=by_ppm_name,
+        dbd_family=dbd_family, cacts_tumor=cacts_tumor, dalessio_system=dalessio_system,
+        tf_contains=tf_contains, tfbs_contains=tfbs_contains, ppm_contains=ppm_contains,
+        vr_contains=vr_contains, dbd_contains=dbd_contains,
+    )
+    order_sql = _enhancer_order_sql(sort_by, sort_dir)
+
+    with _connect(db_path) as con:
+        cur = con.execute(
+            f"""
+            SELECT TF, TF_name_by_PPM, TFBS_sequence, variable_region,
+                   by_ppm_name, rank,
+                   Lambert_DBD_family, Lambert_TF_assessment, Lambert_matched,
+                   n_barcodes
+              FROM enhancers{where_sql}
+              {order_sql}
+            """,
+            params,
+        )
+        for row in cur:
+            yield EnhancerRow(**dict(row))
 
 
 def get_construct(identifier: str, db_path: Path = config.LIBRARY_DB) -> dict | None:

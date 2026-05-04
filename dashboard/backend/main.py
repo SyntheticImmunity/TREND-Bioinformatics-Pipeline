@@ -24,7 +24,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
@@ -206,6 +206,78 @@ def library_enhancers(
         "sort_dir": sort_dir,
         "rows": [r.__dict__ for r in page.rows],
     }
+
+
+@app.get("/library/enhancers/export")
+def library_enhancers_export(
+    q: str | None = Query(default=None),
+    tf: str | None = Query(default=None),
+    tfbs_prefix: str | None = Query(default=None),
+    by_ppm_name: str | None = Query(default=None),
+    dbd_family: str | None = Query(default=None),
+    cacts_tumor: str | None = Query(default=None),
+    dalessio_system: str | None = Query(default=None),
+    tf_contains: str | None = Query(default=None),
+    tfbs_contains: str | None = Query(default=None),
+    ppm_contains: str | None = Query(default=None),
+    vr_contains: str | None = Query(default=None),
+    dbd_contains: str | None = Query(default=None),
+    sort_by: str = Query(default="TF"),
+    sort_dir: str = Query(default="asc", pattern="^(asc|desc)$"),
+) -> StreamingResponse:
+    """Stream the full filtered enhancer set as CSV. Same filter/sort params as
+    /library/enhancers, no pagination — the user gets every row matching their
+    current narrowing in the dashboard's enhancer table."""
+    import csv
+    import io
+    from datetime import date
+
+    # Header labels mirror the dashboard table columns the user is looking at.
+    columns = [
+        ("TF", "TF"),
+        ("Lambert_DBD_family", "DBD Family"),
+        ("TFBS_sequence", "TFBS"),
+        ("variable_region", "Variable Region"),
+        ("by_ppm_name", "PPM Name"),
+        ("rank", "Rank"),
+        ("n_barcodes", "# Barcodes"),
+    ]
+
+    try:
+        row_iter = queries.iter_enhancers_for_export(
+            q=q, tf=tf, tfbs_prefix=tfbs_prefix, by_ppm_name=by_ppm_name,
+            dbd_family=dbd_family, cacts_tumor=cacts_tumor, dalessio_system=dalessio_system,
+            tf_contains=tf_contains, tfbs_contains=tfbs_contains, ppm_contains=ppm_contains,
+            vr_contains=vr_contains, dbd_contains=dbd_contains,
+            sort_by=sort_by, sort_dir=sort_dir,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    def gen():
+        buf = io.StringIO()
+        writer = csv.writer(buf, lineterminator="\n")
+        writer.writerow([label for _, label in columns])
+        n = 0
+        BATCH = 500
+        for row in row_iter:
+            d = row.__dict__
+            writer.writerow([d.get(field, "") if d.get(field) is not None else "" for field, _ in columns])
+            n += 1
+            if n >= BATCH:
+                yield buf.getvalue()
+                buf.seek(0)
+                buf.truncate(0)
+                n = 0
+        if buf.tell():
+            yield buf.getvalue()
+
+    filename = f"trend_library_enhancers_{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        gen(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/library/constructs/{construct_id}")

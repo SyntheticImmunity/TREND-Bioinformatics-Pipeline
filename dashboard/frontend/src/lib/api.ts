@@ -254,6 +254,28 @@ export const api = {
     if (params.offset !== undefined) qs.set("offset", String(params.offset));
     return getJson<EnhancerPage>(`/library/enhancers?${qs.toString()}`);
   },
+  enhancersExportUrl: (params: {
+    q?: string;
+    tf?: string;
+    tfbs_prefix?: string;
+    by_ppm_name?: string;
+    dbd_family?: string;
+    cacts_tumor?: string;
+    dalessio_system?: string;
+    tf_contains?: string;
+    tfbs_contains?: string;
+    ppm_contains?: string;
+    vr_contains?: string;
+    dbd_contains?: string;
+    sort_by?: EnhancerSortColumn;
+    sort_dir?: "asc" | "desc";
+  }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== "") qs.set(k, String(v));
+    }
+    return `/library/enhancers/export?${qs.toString()}`;
+  },
   pipelineSteps: () => getJson<{ schema_version: number; steps: PipelineStep[] }>("/run/steps"),
   runHistory: (limit = 50) => getJson<{ runs: RunHistoryRow[] }>(`/run/history?limit=${limit}`),
   runExample: (project = "ovarian_cancer", tier: ExampleTier = "smoke") =>
