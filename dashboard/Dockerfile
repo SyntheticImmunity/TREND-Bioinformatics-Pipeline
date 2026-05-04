@@ -41,9 +41,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # A few utilities not in the conda env that are useful at runtime
-# (curl for healthchecks, make for our Makefile targets).
+# (curl for healthchecks).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl make ca-certificates \
+ && apt-get install -y --no-install-recommends curl ca-certificates \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
@@ -76,4 +76,8 @@ EXPOSE 8000
 
 # Default: launch the dashboard. Overridable for pipeline runs:
 #   docker run <image> trend run --inputs /data --output /runs
-CMD ["sh", "-c", "make ingest && uvicorn backend.main:app --host 0.0.0.0 --port 8000"]
+#
+# library.sqlite + library_summary.json are baked into the image at build
+# time via the `gh release download` step in .github/workflows/docker-publish.yml,
+# so no `make ingest` is needed at startup.
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

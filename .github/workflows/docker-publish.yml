@@ -24,6 +24,19 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v4
 
+      - name: Download prebuilt library state into build context
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LIBRARY_RELEASE_TAG: library-data-2026-05-04
+        run: |
+          mkdir -p dashboard/backend/state
+          gh release download "$LIBRARY_RELEASE_TAG" \
+            --repo "${{ github.repository }}" \
+            --pattern 'library.sqlite' \
+            --pattern 'library_summary.json' \
+            --dir dashboard/backend/state
+          ls -lh dashboard/backend/state/
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
