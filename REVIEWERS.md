@@ -88,10 +88,22 @@ The fastest way to run the platform is the bundled Docker image. It includes bow
 
 **Prerequisites:** Docker Desktop (https://docker.com/products/docker-desktop). One-click install on Mac and Windows.
 
+> **Windows note:** if the installer reports `For security reasons C:\ProgramData\DockerDesktop must be owned by an elevated account`, right-click the installer and choose **Run as administrator**.
+
+**After installing, launch Docker Desktop and wait for it to be ready.** Installing the application is not the same as running it — the `docker` commands below talk to a background service that only starts when the app is open. Look for the whale icon in the Windows system tray (bottom-right) or the macOS menu bar (top-right): when the icon is solid and stops animating, the service is up. Until then, `docker pull` will fail with `error during connect: ... pipe/docker_engine` (Windows) or `Cannot connect to the Docker daemon` (macOS / Linux).
+
+**Where to run the commands below.** They are not pasted into the Docker Desktop window itself; they go into a terminal application:
+
+- **Windows** — open **PowerShell** (Start menu → type `PowerShell` → Enter) or Windows Terminal.
+- **macOS** — open **Terminal** (Applications → Utilities → Terminal, or press `⌘ Space` and type `Terminal`).
+- **Linux** — any shell you already use (bash, zsh).
+
 ```bash
 docker pull ghcr.io/syntheticimmunity/trend-dashboard:latest
 docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
 ```
+
+The first command downloads the image (~2 GB; runs once, cached afterwards). The second starts the container and prints `Uvicorn running on http://0.0.0.0:8000` when ready. Leave the terminal window open — closing it stops the container. To stop the container manually, return to the terminal and press `Ctrl+C`.
 
 Open **http://localhost:8000** in your browser.
 

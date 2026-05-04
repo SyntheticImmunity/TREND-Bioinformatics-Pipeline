@@ -6,17 +6,11 @@ End-to-end pipeline + interactive dashboard for the TREND enhancer-screening pla
 
 ## 📋 For reviewers
 
-The GitHub repository is **private during the manuscript review period** — you will see a 404 if you try to access it. Use the anonymized mirror the journal forwarded with your review assignment:
+The GitHub repository is private during the manuscript review period; this anonymized mirror is the read-only equivalent and requires no GitHub account or login. After paper acceptance the GitHub repo will be made public and the mirror will retire.
 
-> 🔗 **https://anonymous.4open.science/r/TREND-Bioinformatics-Pipeline**
+For an organized walkthrough of what is in the repository — source files, manuscript numbers and where they appear, bundled reproducibility examples, and the Docker-based local run path — read [`REVIEWERS.md`](REVIEWERS.md). It comes in two parts: Part A describes what is in the repository and runs in 5–10 minutes of browsing; Part B walks through a Docker install and two bundled reproducibility checks (the longer finishes in ~3 minutes on a standard laptop). No HPC cluster is required for either part.
 
-This mirror serves the same code with author identities stripped from commits and identifying terms replaced with `XXXX-N` placeholders. No GitHub account or login is required.
-
-**Most reviewers verify this work in 5–10 minutes by browsing alone.** Open the anonymous URL, then read [`REVIEWERS.md`](REVIEWERS.md) — its "Mode A" section walks you through spot-checking the published numbers (e.g., *204/273 = 74.7% CaCTS coverage*, *11,283 Homeodomain sensors*, *top OvCa hit `ATTTTCCCGCCA_E2F7` at 26.6× selectivity*) directly against the source files. No installation needed.
-
-**Rigorous reviewers can run the verification end-to-end in 20–60 minutes** with the three-tier reproducibility check ([`REVIEWERS.md`](REVIEWERS.md) → Mode B). The repository ships with bundled tiny example datasets so the full pipeline runs on a laptop in minutes — no HPC cluster required.
-
-After paper acceptance the GitHub URL above becomes public and the anonymous mirror is no longer needed.
+The numbers cited in the manuscript (e.g., *204/273 = 74.7% CaCTS coverage*, *11,283 Homeodomain sensors*, *top OvCa hit `ATTTTCCCGCCA_E2F7` at 26.6× selectivity*) appear in the source files directly; REVIEWERS.md § A.2 maps each to its location.
 
 ---
 
@@ -30,14 +24,15 @@ Pick the path matching your environment:
 
 #### Path A — Docker (easiest; zero dependency conflicts)
 
+**Prerequisite:** [Docker Desktop](https://docker.com/products/docker-desktop) installed on macOS or Windows (one-click installer); on Linux, the `docker` engine.
+
 ```bash
-# Reviewer verification: launch the dashboard with bundled examples
 docker pull ghcr.io/syntheticimmunity/trend-dashboard:latest
 docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
 # → open http://localhost:8000
 ```
 
-The image bundles bowtie2, samtools, cutadapt, fastx-toolkit, R + tidyverse + Rsamtools, Python, all dependencies, and the pre-built dashboard frontend. Works on macOS, Windows (with Docker Desktop), and Linux. ~5 min from clean machine to running dashboard.
+The image bundles bowtie2, samtools, cutadapt, fastx-toolkit, R + tidyverse + Rsamtools, Python, all dependencies, and the pre-built dashboard frontend. ~5 min from clean machine to running dashboard.
 
 The same image runs your own data — mount input/output directories and override the default command:
 
@@ -124,7 +119,7 @@ The dashboard wraps — but never modifies — the existing manuscript scripts i
 
 ## Data: what's in git, what's downloaded separately
 
-The repository contains all code plus a small set of bundled fixtures (~36 MB) sufficient for the three-tier reviewer reproducibility check. The **full data** (~3 GB: published per-barcode count tables for all screens + the 152 MB Lib4 reference + the 445 MB per-construct metadata) is hosted on Dropbox and fetched by a one-line script:
+The repository contains all code plus a small set of bundled fixtures (~36 MB) sufficient for the bundled reproducibility checks. The **full data** (~3 GB: published per-barcode count tables for all screens + the 152 MB Lib4 reference + the 445 MB per-construct metadata) is hosted on Dropbox and fetched by a one-line script:
 
 ```bash
 # macOS / Linux
@@ -140,19 +135,16 @@ After paper acceptance, the full dataset will be migrated to a Zenodo deposit wi
 
 ---
 
-## Verifying the manuscript's claims (the three reviewer tiers)
+## Verifying the manuscript's claims
 
-Every install path supports the same three reproducibility checks. Run any tier from the dashboard's Verify page or via the CLI:
+The dashboard's Verify tab exposes two reproducibility checks against bundled example datasets, both also runnable from the CLI:
 
 ```bash
-trend run --example ovarian_cancer --tier smoke      # ~1 s   no tools needed
-trend run --example ovarian_cancer --tier step9      # ~30 s  needs R
-trend run --example ovarian_cancer --tier pipeline   # ~3 min needs the full conda env
+trend run --example ovarian_cancer --tier step9      # ~30 s   needs R; reproduces the published activity numbers from a 1,000-promoter slice of real OvCa alignment data
+trend run --example ovarian_cancer --tier pipeline   # ~3 min  needs the full conda env; runs the full FASTQ-to-counts pipeline on simulated reads
 ```
 
-Each prints a self-contained report ending in `overall_pass: True` plus per-file column-by-column match results. Tier 2 is the load-bearing reproducibility check — it confirms the unchanged Step-9 R script reproduces the published activity numbers row-for-row from the bundled subsample of real OvCa alignment data. Tier 3 confirms the full FASTQ-to-counts plumbing on simulated reads.
-
-The dashboard's `/run/example` page exposes the same tiers as click-to-run buttons, with a green "all match" badge and per-file diff if anything differs.
+Each prints a self-contained report ending in `overall_pass: True` plus per-file column-by-column match results. The dashboard exposes the same checks as click-to-run cards on the Verify tab, with a green "match" badge and per-file diff if anything differs.
 
 ---
 
@@ -161,7 +153,7 @@ The dashboard's `/run/example` page exposes the same tiers as click-to-run butto
 | Document | Audience | Length |
 |---|---|---|
 | [`README.md`](README.md) | Everyone — first impression | This file |
-| [`REVIEWERS.md`](REVIEWERS.md) | Journal reviewers | ~10 min read; ships a 5-min Mode A path and a 30-min Mode B path |
+| [`REVIEWERS.md`](REVIEWERS.md) | Journal reviewers | Two parts: Part A (browsing) and Part B (running the code via Docker) |
 | [`MANUAL.md`](MANUAL.md) | New users / adopters | Comprehensive install, dashboard tour, troubleshooting, glossary |
 | [`references/TREND_library_TF_breakdown.md`](references/TREND_library_TF_breakdown.md) | Reviewers + curious adopters | Reconciliation of the 1,068 / 729 / 695 / 49 numbers against Lambert |
 | [`CHANGELOG.md`](CHANGELOG.md) | Anyone tracking releases | Release notes per version |
