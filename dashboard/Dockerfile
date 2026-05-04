@@ -40,13 +40,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# A few utilities not in the conda env that are useful at runtime
-# (curl for healthchecks).
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
-
 # Install the conda env. Copying just the env file first lets Docker cache
 # the (slow) mamba install layer until environment.yml itself changes.
 COPY pipeline/environment.yml /tmp/environment.yml
