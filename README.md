@@ -32,12 +32,16 @@ docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
 
 The image bundles bowtie2, samtools, cutadapt, fastx-toolkit, R + tidyverse + Rsamtools, Python, all dependencies, and the pre-built dashboard frontend. ~5 min from clean machine to running dashboard.
 
-The same image runs your own data — mount input/output directories and override the default command:
+The same image runs your own data — mount your FASTQs, output dir, the Lib4 reference (downloaded in the next section), and your project scaffold; then override the default command:
 
 ```bash
-docker run -v /path/to/fastqs:/data -v /path/to/output:/runs \
+docker run --rm \
+  -v /path/to/fastqs:/data/fastqs \
+  -v /path/to/runs:/data/runs \
+  -v "$(pwd)/codes/2. HPC_cluster_scripts/required_metadata:/app/codes/2. HPC_cluster_scripts/required_metadata" \
+  -v "$(pwd)/my-experiment:/app/my-experiment" \
   ghcr.io/syntheticimmunity/trend-dashboard:latest \
-  trend run --inputs /data --output /runs/$(date +%F)
+  trend run --inputs /data/fastqs --output /data/runs/$(date +%F)
 ```
 
 For HPC clusters that disallow Docker, convert once to Singularity:
@@ -62,17 +66,36 @@ trend preflight    # verify every required tool is installed
 
 See [`MANUAL.md`](MANUAL.md) § 3 for OS-specific commands to install bowtie2, samtools, cutadapt, fastx-toolkit, and R + tidyverse + Rsamtools system-wide, then `pip install -e ./pipeline`.
 
+### Get the Lib4 reference data (one-time)
+
+The bowtie2 alignment reference (`Lib4.fasta`) and per-construct metadata (`Lib4_info_concise_060621.csv`) exceed GitHub's per-file size limit and live on Dropbox. One command pulls them and places each file at the path the pipeline expects:
+
+```bash
+# macOS / Linux
+bash scripts/download_data.sh
+
+# Windows (PowerShell)
+pwsh scripts/download_data.ps1
+```
+
+This downloads ~3 GB total (the Lib4 reference plus the published alignment count tables for full Step 9 reproducibility). Idempotent — safe to re-run; skips files already present.
+
+You don't need this download for the bundled reproducibility checks under `trend run --example` — only for `trend run` against your own FASTQs.
+
 ### Per-experiment loop
 
 ```bash
 # Scaffold a project from one of the bundled templates
-trend init my-experiment --template T_cell_activation     # or: ovarian_cancer
+trend init my-experiment --template ovarian_cancer     # or: T_cell_activation
 cd my-experiment
 
-# Edit the ONLY configuration you need to touch
-$EDITOR samplesheet.yaml      # sample IDs, FASTQ paths, conditions, replicate groups
+# Edit the ONLY configuration you need to touch.
+# Per sample: id (must match FASTQ filename), fastq path, role (DNA|RNA),
+# condition, replicate_group, dna_threshold. Plus an analysis: block at the
+# bottom defining bc_threshold and the contrasts to compute.
+$EDITOR samplesheet.yaml
 
-# Run the 9-step pipeline (workstation)
+# Run the 9-step pipeline (workstation, ~hours per 16 samples on 8 cores)
 trend run --inputs ./fastqs/ --output runs/$(date +%F)/
 
 # Or on an HPC cluster — Snakemake handles SLURM submission for you
@@ -81,6 +104,8 @@ trend run --inputs /scratch/fastqs/ --output runs/2026-04/ --profile slurm
 # Browse results in the dashboard (any computer; doesn't need bowtie2 installed)
 trend dashboard --runs ./runs/
 ```
+
+For the full sample-sheet field reference, plus how to surface your own activity table on the Results page (strip plot, drill-downs, CSV export), see [`MANUAL.md`](MANUAL.md) § 7.
 
 Open `http://localhost:8000` to see the library composition panels (Figure 1A–E faithfully reproduced as interactive plots), the cancer-selectivity scatter (Figure 1F), and a sortable enhancer table.
 

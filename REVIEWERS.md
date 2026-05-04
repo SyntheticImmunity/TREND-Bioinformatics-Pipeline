@@ -136,14 +136,89 @@ Each prints a self-contained report ending in `overall_pass: True`.
 
 ## Running TREND on your own data
 
-For reviewers who also wear the adopter hat. See **MANUAL.md** § 7 for the walkthrough. The short form:
+For reviewers who also wear the adopter hat. The detailed walkthrough is in **MANUAL.md** § 7; what follows is a self-contained recipe.
+
+### Prerequisites
+
+1. **The Lib4 reference data (~600 MB).** The bowtie2 alignment reference (`Lib4.fasta`) and per-construct metadata (`Lib4_info_concise_060621.csv`) exceed GitHub's 100 MB per-file limit and are hosted on Dropbox. One command fetches them and places each file at the path the pipeline expects:
+
+   ```bash
+   # macOS / Linux
+   bash scripts/download_data.sh
+
+   # Windows (PowerShell)
+   pwsh scripts/download_data.ps1
+   ```
+
+   The script downloads ~3 GB total (the Lib4 reference plus the published alignment count tables — the latter aren't needed for `trend run` on your own data, but they let you re-run Step 9 against the full published OvCa data if you want). It's idempotent; safe to re-run, skips files already present.
+
+   *The Docker image you pulled in § B.2 bakes in the dashboard's much smaller `library.sqlite` (892 MB) but not the FASTA reference — you still need this download to run the pipeline on your own FASTQs.*
+
+2. **A directory of demultiplexed `.fastq.gz` files** — one per sample. The pipeline auto-discovers samples from filenames: `OV8_DNA_r1.fastq.gz` becomes sample `OV8_DNA_r1`. Whatever naming convention you pick must match the `id` field in the sample sheet you'll edit below.
+
+3. **The runtime.** Either the Docker image (recommended; everything is bundled) or a local conda env (`conda env create -f pipeline/environment.yml; conda activate trend; pip install -e ./pipeline`).
+
+### Step 1 — Scaffold the project
 
 ```bash
-trend init my-experiment --template T_cell_activation
-$EDITOR my-experiment/samplesheet.yaml
-trend run --inputs ./fastqs/ --output runs/$(date +%F)/
-trend dashboard --runs runs/
+trend init my-experiment --template ovarian_cancer    # or: T_cell_activation
+ls my-experiment/
+# samplesheet.yaml   project.yaml   README.md
 ```
+
+The template seeds `samplesheet.yaml` with the published sample structure, which you edit in step 2. Pick whichever template's biology is closest to yours; the only material difference between templates is the contrast structure in the analysis block.
+
+### Step 2 — Edit the sample sheet
+
+Open `my-experiment/samplesheet.yaml`. Replace the example sample rows with your own. Fields per sample:
+
+| Field | Meaning |
+|---|---|
+| `id` | Sample ID; must match the FASTQ filename without `.fastq.gz` |
+| `fastq` | Path to the FASTQ file (relative to where you'll run `trend run`) |
+| `role` | `RNA` (readout) or `DNA` (input control) |
+| `condition` | Free-form label used in contrasts (e.g. `tumor`, `control`, `stim`, `rest`) |
+| `replicate_group` | Integer; samples in the same group are biological replicates |
+| `dna_threshold` | Min DNA-input reads per barcode (typical 2–30 depending on coverage) |
+
+The `analysis:` block at the bottom defines `bc_threshold` (min supporting barcodes per promoter; typical 3–8) and the `contrasts:` list — each contrast names two conditions to compare, e.g. `{ name: tumor_vs_control, tumor: OV8, control: IOSE }`.
+
+### Step 3 — Run the pipeline
+
+**Local conda environment (simplest if you have the env already activated):**
+
+```bash
+conda activate trend
+trend run --inputs ./fastqs/ --output runs/$(date +%F)/
+```
+
+**Docker (if you'd rather not install anything beyond Docker):**
+
+```bash
+docker run --rm \
+  -v "$(pwd)/fastqs:/data/fastqs" \
+  -v "$(pwd)/runs:/data/runs" \
+  -v "$(pwd)/codes/2. HPC_cluster_scripts/required_metadata:/app/codes/2. HPC_cluster_scripts/required_metadata" \
+  -v "$(pwd)/my-experiment:/app/my-experiment" \
+  ghcr.io/syntheticimmunity/trend-dashboard:latest \
+  trend run --inputs /data/fastqs --output /data/runs/$(date +%F)/
+```
+
+The four `-v` mounts make four host directories visible inside the container: your FASTQs (read-only input), the runs output dir (where outputs get written), the Lib4 reference you just downloaded, and the project scaffold from step 1.
+
+The runner streams per-step progress. A 16-sample run on a workstation with 8 cores typically takes hours-to-overnight depending on read depth.
+
+### Step 4 — View the results
+
+```bash
+trend dashboard --runs ./runs/
+```
+
+Open http://localhost:8000. The new run appears under the Pipeline tab's history. To make your own activity table show up on the **Results** page (with strip plot, sortable selective-enhancer table, drill-down to PWMs and constructs, CSV download), follow **MANUAL.md § 7 step 4a** — it's a one-block config entry pointing the dashboard at your CSV.
+
+### HPC / SLURM
+
+If your data is on a cluster, add `--profile slurm` to the `trend run` command. The cluster config lives in `pipeline/trend/workflow/profiles/slurm/`. See **MANUAL.md § 7 step 3** for details.
 
 ---
 
