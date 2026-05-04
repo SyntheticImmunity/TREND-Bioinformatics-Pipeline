@@ -183,6 +183,26 @@ export function EnhancerTable() {
             )}
           </div>
         </div>
+        <a
+          href={api.enhancersExportUrl({
+            q: debouncedSearch || undefined,
+            tf_contains: debouncedColFilters["TF"] || undefined,
+            dbd_contains: debouncedColFilters["DBD_family"] || undefined,
+            tfbs_contains: debouncedColFilters["TFBS_sequence"] || undefined,
+            vr_contains: debouncedColFilters["variable_region"] || undefined,
+            ppm_contains: debouncedColFilters["by_ppm_name"] || undefined,
+            dbd_family: filter.kind === "dbd_family" && filter.value ? filter.value : undefined,
+            cacts_tumor: filter.kind === "cacts_tumor" && filter.value ? filter.value : undefined,
+            dalessio_system: filter.kind === "dalessio_system" && filter.value ? filter.value : undefined,
+            sort_by: sortBy,
+            sort_dir: sortDir,
+          })}
+          download
+          className="inline-flex items-center gap-1.5 self-end rounded-standard border border-cream-border bg-cream px-3 py-1.5 text-sm text-charcoal-82 hover:border-charcoal-40 hover:text-charcoal transition-colors"
+          title={`Download all ${(data?.total ?? 0).toLocaleString()} matching enhancers as CSV`}
+        >
+          ↓ Download CSV
+        </a>
       </div>
 
       {error && (

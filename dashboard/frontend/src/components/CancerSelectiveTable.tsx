@@ -53,6 +53,53 @@ type PageSize = 50 | 100 | 500 | "all";
 const PAGE_SIZE_OPTIONS: PageSize[] = [50, 100, 500, "all"];
 const DEFAULT_PAGE_SIZE: PageSize = 100;
 
+function csvEscape(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function downloadCsv(rows: RankedPoint[], project: string, expLabel: string, ctrlLabel: string) {
+  if (rows.length === 0) return;
+  const header = [
+    "Rank",
+    "TF",
+    "Enhancer",
+    "PPM",
+    "PPM Rank",
+    `${expLabel} Activity`,
+    `${ctrlLabel} Activity`,
+    `${expLabel}/${ctrlLabel}`,
+  ];
+  const lines = [header.join(",")];
+  for (const r of rows) {
+    lines.push(
+      [
+        r.naturalRank,
+        r.tf ?? "",
+        r.promoter_name ?? "",
+        r.by_ppm_name ?? "",
+        r.rank ?? "",
+        r.ov8_activity.toFixed(2),
+        r.iose_activity != null ? r.iose_activity.toFixed(2) : "",
+        r.selectivity_ratio.toFixed(3),
+      ]
+        .map(csvEscape)
+        .join(","),
+    );
+  }
+  const blob = new Blob([lines.join("\n") + "\n"], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const today = new Date().toISOString().slice(0, 10);
+  a.download = `trend_${project}_selective_${today}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function cmp(a: unknown, b: unknown): number {
   if (a === b) return 0;
   if (a === null || a === undefined) return 1;
@@ -210,6 +257,15 @@ export function CancerSelectiveTable({ rows, project, title, onFilteredRowsChang
             to sort, shift+click to add a secondary sort · type in any column header to filter
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => downloadCsv(sorted, project, expLabel, ctrlLabel)}
+          disabled={sorted.length === 0}
+          className="inline-flex items-center gap-1.5 self-end rounded-standard border border-cream-border bg-cream px-3 py-1.5 text-sm text-charcoal-82 hover:border-charcoal-40 hover:text-charcoal transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          title={`Download ${sorted.length.toLocaleString()} rows as CSV (current filter and sort)`}
+        >
+          ↓ Download CSV
+        </button>
       </div>
 
       <div className="mt-4">
