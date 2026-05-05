@@ -23,19 +23,13 @@ make backend          # FastAPI on http://localhost:8000
 make frontend         # Vite dev server on http://localhost:5173
 ```
 
-Native dev is best-effort. The container is the canonical runtime per plan decision D7 (R 3.5.1 pinned to match `Lib4_all_steps_FINAL_111525.sbatch:62`).
+Native dev is best-effort. The container is the canonical runtime — it pins R 3.5.1 to match the manuscript SLURM script (`Lib4_all_steps_FINAL_111525.sbatch:62`).
 
 ## Architecture
 
 - `backend/` - FastAPI app + pipeline runner + library service + provenance writer
 - `frontend/` - React + TypeScript + Vite + Tailwind + shadcn/ui
 - `projects/` - Per-project sample sheets and parameters (ovarian_cancer, T_cell_activation)
-- `example_data/` - Tiny bundled fixtures for the FR-4 reviewer oracle
+- `example_data/` - Bundled fixtures for the install-check oracle
 - `runs/` - Run history (provenance manifests)
 - `state/` - Generated runtime artifacts (library.sqlite, runs.sqlite, library_summary.json)
-
-See `../DASHBOARD_PRD.md` and `../DESIGN.md` for the full product requirements and visual system.
-
-## Status
-
-Phase 1 / Week 1 in progress. See `~/.claude/plans/now-i-want-you-quizzical-mountain.md` for the build plan.
