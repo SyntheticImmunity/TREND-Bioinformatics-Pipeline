@@ -2,7 +2,7 @@
  * Panel A of Figure 1: TREND workflow schematic.
  *
  * Three numbered steps from the manuscript:
- *   1. Library design — PPMs/PWMs → consensus + 9 variants → arrayed library
+ *   1. Library design — PPMs/PWMs → consensus + 9 variants (10 sequences total) → arrayed library
  *   2. Cellular delivery — pooled lentivirus into target cells
  *   3. Activity quantification — barcode-linked RNA / DNA via targeted NGS
  *
@@ -23,7 +23,7 @@ const STEPS: Step[] = [
     title: "Library design",
     body:
       "PPMs and PWMs from 1,068 proteins with annotated DNA-binding motifs across 14 databases generate consensus sequences plus nine high-probability variants per matrix. Each sequence is arrayed in tandem upstream of an adenoviral minimal promoter, linked to a unique DNA barcode, and packaged into a pooled lentiviral library.",
-    highlight: "1,068 TFs · 14 databases · 9 variants / matrix",
+    highlight: "1,068 TFs · 14 databases · 10 sequences / matrix",
   },
   {
     index: 2,
@@ -60,8 +60,14 @@ export function WorkflowSchematic() {
           {i < STEPS.length - 1 && (
             <span
               aria-hidden
-              className="hidden md:block absolute top-1/2 -translate-y-1/2 text-charcoal-40 text-xl font-light pointer-events-none"
-              style={{ left: `calc(${((i + 1) / STEPS.length) * 100}% - 0.5rem)` }}
+              className="hidden md:block absolute top-1/2 -translate-x-1/2 -translate-y-1/2 text-charcoal-40 text-xl font-light pointer-events-none"
+              style={{
+                // Center of the gap between cards i and i+1 in a gap-6 (1.5rem)
+                // grid: (i+1) card-widths + (i + 0.5) gap-widths from the left,
+                // where card_width = (100% - (N-1)*1.5rem) / N. translate-x-1/2
+                // then centers the rendered span on that point.
+                left: `calc(${i + 1} * (100% - ${(STEPS.length - 1) * 1.5}rem) / ${STEPS.length} + ${(i + 0.5) * 1.5}rem)`,
+              }}
             >
               →
             </span>

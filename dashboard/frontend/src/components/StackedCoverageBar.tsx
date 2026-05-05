@@ -119,9 +119,9 @@ export function StackedCoverageBar({ variant }: Props) {
         </span>
       </div>
 
-      <div style={{ width: "100%", height: 380 }}>
+      <div style={{ width: "100%", height: 420 }}>
         <ResponsiveContainer>
-          <BarChart data={rows} margin={{ top: 28, right: 16, bottom: 60, left: 32 }}>
+          <BarChart data={rows} margin={{ top: 28, right: 16, bottom: 60, left: 48 }}>
             <CartesianGrid stroke="#eceae4" vertical={false} />
             <XAxis
               dataKey="name"
@@ -159,12 +159,13 @@ export function StackedCoverageBar({ variant }: Props) {
             <YAxis
               tick={{ fill: "#5f5f5d", fontSize: 11 }}
               label={{
-                value: isCacts ? "Number of candidate MTFs" : "Number of candidate core identity TFs",
+                value: isCacts ? "Candidate MTFs" : "Core identity TFs",
                 angle: -90,
                 position: "insideLeft",
                 fill: "#5f5f5d",
                 fontSize: 12,
-                offset: 10,
+                offset: 0,
+                style: { textAnchor: "middle" },
               }}
               allowDecimals={false}
             />
