@@ -1,38 +1,52 @@
 # TREND sample sheet — ovarian cancer template.
 #
-# This file is the ONLY configuration the user needs to edit. The pipeline
-# reads it to discover sample IDs, their roles (DNA input vs RNA readout),
-# their replicate structure, and the per-sample DNA-abundance threshold
-# applied during the Step 9 enhancer-activity analysis.
+# This file is the source of truth for the pipeline. The runner reads it to
+# find your samples, render the Step-9 R script for your experimental design,
+# and apply your DNA-coverage thresholds. Edit the entries below to match
+# your own data.
 #
-# The values below mirror the published OvCa run for reference. Replace them
-# with your own sample IDs / FASTQ paths / thresholds.
+# Each `samples:` row is one experimental sample = one (cell_line, replicate)
+# pair. Every pair has a DNA FASTQ (input plasmid pool, used for normalization)
+# and an RNA FASTQ (cellular readout). The `dna_fastq` and `rna_fastq` values
+# MUST match your filenames in the --inputs directory, without the
+# `.fastq.gz` extension.
 #
-# Source of the published numbers:
-#   sample names    — ovarian_cancer_specific_enhancer_screening_analysis.R:59-67
-#   thresholds      — same file, line 66
-#   bc_threshold    — same file, line 215
+# `dna_threshold` filters low-coverage barcodes by their DNA-side count. Pick
+# it after looking at DNA_threshold_for_samples.pdf from your first run; if
+# omitted the runner uses 3 and stamps a THRESHOLDS_DEFAULT marker so you
+# remember to come back and tune.
+#
+# The published OvCa values below are kept as a reference example. Replace
+# them with your own.
 
 project: ovarian_cancer
 
 samples:
-  # Cell line: OV8 (ovarian cancer)
-  - { id: OV8_r1,  fastq: fastqs/OV8_r1.fastq.gz,  role: RNA, condition: tumor,    cell_line: OV8,  replicate_group: 1, dna_threshold: 2 }
-  - { id: OV8_r2,  fastq: fastqs/OV8_r2.fastq.gz,  role: RNA, condition: tumor,    cell_line: OV8,  replicate_group: 2, dna_threshold: 3 }
-  - { id: OV8_r3,  fastq: fastqs/OV8_r3.fastq.gz,  role: RNA, condition: tumor,    cell_line: OV8,  replicate_group: 3, dna_threshold: 5 }
+  # ------------------ OV8 (ovarian cancer; tumor) ------------------
+  - { cell_line: OV8,  replicate: 1, dna_fastq: OV8_Lib4_DNA_r1,  rna_fastq: OV8_Lib4_RNA_r1,  dna_threshold: 2 }
+  - { cell_line: OV8,  replicate: 2, dna_fastq: OV8_Lib4_DNA_r2,  rna_fastq: OV8_Lib4_RNA_r2,  dna_threshold: 3 }
+  - { cell_line: OV8,  replicate: 3, dna_fastq: OV8_Lib4_DNA_r3,  rna_fastq: OV8_Lib4_RNA_r3,  dna_threshold: 5 }
 
-  # Cell line: IOSE (immortalized normal ovarian surface epithelium - control)
-  - { id: IOSE_r1, fastq: fastqs/IOSE_r1.fastq.gz, role: RNA, condition: control,  cell_line: IOSE, replicate_group: 1, dna_threshold: 6 }
-  - { id: IOSE_r2, fastq: fastqs/IOSE_r2.fastq.gz, role: RNA, condition: control,  cell_line: IOSE, replicate_group: 2, dna_threshold: 3 }
-  - { id: IOSE_r3, fastq: fastqs/IOSE_r3.fastq.gz, role: RNA, condition: control,  cell_line: IOSE, replicate_group: 3, dna_threshold: 2 }
+  # ----------------- IOSE (immortalized normal ovarian; control) -------------------
+  - { cell_line: IOSE, replicate: 1, dna_fastq: IOSE_Lib4_DNA_r1, rna_fastq: IOSE_Lib4_RNA_r1, dna_threshold: 6 }
+  - { cell_line: IOSE, replicate: 2, dna_fastq: IOSE_Lib4_DNA_r2, rna_fastq: IOSE_Lib4_RNA_r2, dna_threshold: 3 }
+  - { cell_line: IOSE, replicate: 3, dna_fastq: IOSE_Lib4_DNA_r3, rna_fastq: IOSE_Lib4_RNA_r3, dna_threshold: 2 }
 
-  # Cell line: ID8 (mouse ovarian cancer)
-  - { id: ID8_r1,  fastq: fastqs/ID8_r1.fastq.gz,  role: RNA, condition: tumor,    cell_line: ID8,  replicate_group: 1, dna_threshold: 30 }
-  - { id: ID8_r2,  fastq: fastqs/ID8_r2.fastq.gz,  role: RNA, condition: tumor,    cell_line: ID8,  replicate_group: 2, dna_threshold: 35 }
+  # ----------------- ID8 (mouse ovarian cancer; tumor) --------------
+  - { cell_line: ID8,  replicate: 1, dna_fastq: ID8_Lib4_DNA_r1,  rna_fastq: ID8_Lib4_RNA_r1,  dna_threshold: 30 }
+  - { cell_line: ID8,  replicate: 2, dna_fastq: ID8_Lib4_DNA_r2,  rna_fastq: ID8_Lib4_RNA_r2,  dna_threshold: 35 }
 
-# Per-promoter analysis parameters (defaults match the published OvCa Step 9 run).
 analysis:
-  bc_threshold: 3      # minimum supporting barcodes per promoter
+  # Minimum supporting barcodes per promoter for inclusion in the activity table.
+  # Higher = stricter / fewer promoters; lower = more promoters but noisier.
+  # Published OvCa used 3.
+  bc_threshold: 3
+
+  # Which contrasts to compute. Each produces three output columns:
+  #   mean_<experimental>_RD_ratio
+  #   mean_<control>_RD_ratio
+  #   mean_<experimental>_to_<control>_RD_ratio
+  # The `experimental` and `control` values must match a `cell_line:` above.
   contrasts:
-    - { name: OV8_vs_IOSE, tumor: OV8, control: IOSE }
-    - { name: ID8_vs_IOSE, tumor: ID8, control: IOSE }
+    - { name: OV8_vs_IOSE, experimental: OV8, control: IOSE }
+    - { name: ID8_vs_IOSE, experimental: ID8, control: IOSE }

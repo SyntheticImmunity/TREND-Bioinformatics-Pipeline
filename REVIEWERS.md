@@ -136,76 +136,187 @@ Each prints a self-contained report ending in `overall_pass: True`.
 
 ## Running TREND on your own data
 
-For reviewers who also wear the adopter hat. The detailed walkthrough is in **MANUAL.md** § 7; what follows is a self-contained recipe.
+This section takes you from raw FASTQs to a published-style activity table. It uses an **iterative threshold-tuning loop** because picking DNA thresholds is a human-in-the-loop decision: you have to look at per-sample DNA-coverage distributions before you can choose them sensibly. The flow:
+
+1. Scaffold a project from a template.
+2. Fill in the sample sheet (filenames + experimental design — leave thresholds blank).
+3. Run the pipeline once → get alignment + preliminary results + a PDF of DNA distributions.
+4. Open the PDF, decide thresholds per sample.
+5. Edit the sample sheet, re-run Step 9 only (~minutes — not the hours that re-alignment would take).
+6. Repeat step 5 until satisfied.
+
+A separate path for bioinformaticians who want direct R control is at the bottom.
 
 ### Prerequisites
 
-1. **A directory of demultiplexed `.fastq.gz` files** — one per sample. The pipeline auto-discovers samples from filenames: `OV8_DNA_r1.fastq.gz` becomes sample `OV8_DNA_r1`. Whatever naming convention you pick must match the `id` field in the sample sheet you'll edit below.
+- The Docker image already pulled (or the conda env activated). See § B.2 if neither.
+- A directory of demultiplexed `.fastq.gz` files — one per sample.
 
-2. **The runtime.** If you used the Docker image in § B.2, you already have everything — the Lib4 alignment reference (`Lib4.fasta`) and per-construct metadata (`Lib4_info_concise_060621.csv`) are baked into the image. No additional downloads needed.
+### A note on the multi-line commands below
 
-   If you'd rather use a local conda env: `conda env create -f pipeline/environment.yml; conda activate trend; pip install -e ./pipeline`. Then run `bash scripts/download_data.sh` (macOS/Linux) or `pwsh scripts/download_data.ps1` (Windows) to fetch the Lib4 reference from Dropbox into `codes/2. HPC_cluster_scripts/required_metadata/`. The script is idempotent.
+Several `docker run` commands in this section span multiple lines. Each non-final line ends in `\` (on macOS/Linux) or `` ` `` (on Windows PowerShell). That trailing character is your shell's **line-continuation marker** — it tells the shell "this command continues on the next line." Two practical consequences:
+
+- **Paste the entire block at once**, not line by line. Selecting all lines together and pasting works in Terminal (macOS), iTerm, GNOME Terminal (Linux), PowerShell, and Windows Terminal.
+- **The line-continuation character is shell-specific.** bash and zsh use `\`; PowerShell uses the backtick `` ` ``. Each multi-line command is shown in two versions — pick the one for your shell.
 
 ### Step 1 — Scaffold the project
 
 ```bash
-trend init my-experiment --template ovarian_cancer    # or: T_cell_activation
-ls my-experiment/
-# samplesheet.yaml   project.yaml   README.md
+trend init my-experiment --template ovarian_cancer
+cd my-experiment
 ```
 
-The template seeds `samplesheet.yaml` with the published sample structure, which you edit in step 2. Pick whichever template's biology is closest to yours; the only material difference between templates is the contrast structure in the analysis block.
+You now have:
 
-### Step 2 — Edit the sample sheet
+```
+my-experiment/
+├── samplesheet.yaml      ← the only file you'll edit
+├── project.yaml
+└── README.md
+```
 
-Open `my-experiment/samplesheet.yaml`. Replace the example sample rows with your own. Fields per sample:
+The template is pre-filled with the published OvCa example (3 cell lines, 8 samples). Replace it in the next step.
 
-| Field | Meaning |
+### Step 2 — Edit `samplesheet.yaml` (filenames + design only)
+
+Open `samplesheet.yaml` in any text editor. Each row is one experimental sample = one (cell_line, replicate) pair, with a DNA FASTQ + RNA FASTQ. **Don't fill in `dna_threshold` yet** — leave it out. You'll come back after step 4.
+
+```yaml
+project: ovarian_cancer
+
+samples:
+  # OV8 (tumor cell line) — 3 biological replicates
+  - { cell_line: OV8,  replicate: 1, dna_fastq: OV8_Lib4_DNA_r1,  rna_fastq: OV8_Lib4_RNA_r1  }
+  - { cell_line: OV8,  replicate: 2, dna_fastq: OV8_Lib4_DNA_r2,  rna_fastq: OV8_Lib4_RNA_r2  }
+  - { cell_line: OV8,  replicate: 3, dna_fastq: OV8_Lib4_DNA_r3,  rna_fastq: OV8_Lib4_RNA_r3  }
+  # IOSE (normal control)
+  - { cell_line: IOSE, replicate: 1, dna_fastq: IOSE_Lib4_DNA_r1, rna_fastq: IOSE_Lib4_RNA_r1 }
+  - { cell_line: IOSE, replicate: 2, dna_fastq: IOSE_Lib4_DNA_r2, rna_fastq: IOSE_Lib4_RNA_r2 }
+  - { cell_line: IOSE, replicate: 3, dna_fastq: IOSE_Lib4_DNA_r3, rna_fastq: IOSE_Lib4_RNA_r3 }
+
+analysis:
+  bc_threshold: 3
+  contrasts:
+    - { name: OV8_vs_IOSE, experimental: OV8, control: IOSE }
+```
+
+**Per-row fields:**
+
+| Field | What to put |
 |---|---|
-| `id` | Sample ID; must match the FASTQ filename without `.fastq.gz` |
-| `fastq` | Path to the FASTQ file (relative to where you'll run `trend run`) |
-| `role` | `RNA` (readout) or `DNA` (input control) |
-| `condition` | Free-form label used in contrasts (e.g. `tumor`, `control`, `stim`, `rest`) |
-| `replicate_group` | Integer; samples in the same group are biological replicates |
-| `dna_threshold` | Min DNA-input reads per barcode (typical 2–30 depending on coverage) |
+| `cell_line` | Your cell-line name (e.g. `OV8`, `MCF7`) |
+| `replicate` | Integer (1, 2, 3, …) |
+| `dna_fastq` | Filename of your DNA FASTQ **without `.fastq.gz`** |
+| `rna_fastq` | Same, for the RNA FASTQ |
+| `dna_threshold` | **Leave out for now.** Will be filled in step 5. |
 
-The `analysis:` block at the bottom defines `bc_threshold` (min supporting barcodes per promoter; typical 3–8) and the `contrasts:` list — each contrast names two conditions to compare, e.g. `{ name: tumor_vs_control, tumor: OV8, control: IOSE }`.
+**Per-analysis fields:**
 
-### Step 3 — Run the pipeline
+| Field | What to put |
+|---|---|
+| `bc_threshold` | Min supporting barcodes per promoter. Published OvCa used `3`. Higher = stricter. |
+| `contrasts` | One entry per ratio you want computed. `experimental` and `control` must match cell-line names from your `samples:` rows. |
 
-**Local conda environment (simplest if you have the env already activated):**
+### Step 3 — First run
 
-```bash
-conda activate trend
-trend run --inputs ./fastqs/ --output runs/$(date +%F)/
-```
+This kicks off Steps 1-8 (alignment, ~hours) plus Step 9 with default thresholds (`dna_threshold: 3` everywhere) so you have *something* to look at right away.
 
-**Docker (recommended — nothing else to install):**
+**macOS / Linux (bash or zsh):**
 
 ```bash
 docker run --rm \
   -v "$(pwd)/fastqs:/data/fastqs" \
   -v "$(pwd)/runs:/data/runs" \
-  -v "$(pwd)/my-experiment:/app/my-experiment" \
+  -v "$(pwd):/app/my-experiment" \
   ghcr.io/syntheticimmunity/trend-dashboard:latest \
-  trend run --inputs /data/fastqs --output /data/runs/$(date +%F)/
+  trend run --inputs /data/fastqs --output /data/runs/$(date +%F)/ \
+    --samplesheet /app/my-experiment/samplesheet.yaml --profile snakemake
 ```
 
-The three `-v` mounts expose three host directories inside the container: your FASTQs (read-only input), the runs output dir (where outputs get written), and the project scaffold from step 1. The Lib4 reference is already inside the image.
+**Windows PowerShell:**
 
-The runner streams per-step progress. A 16-sample run on a workstation with 8 cores typically takes hours-to-overnight depending on read depth.
+```powershell
+$today = Get-Date -Format yyyy-MM-dd
+docker run --rm `
+  -v "${PWD}/fastqs:/data/fastqs" `
+  -v "${PWD}/runs:/data/runs" `
+  -v "${PWD}:/app/my-experiment" `
+  ghcr.io/syntheticimmunity/trend-dashboard:latest `
+  trend run --inputs /data/fastqs --output /data/runs/$today/ `
+    --samplesheet /app/my-experiment/samplesheet.yaml --profile snakemake
+```
 
-### Step 4 — View the results
+When it finishes, you'll see this in `runs/<date>/`:
+
+```
+alignment_result_normalized_in_house_pipeline.csv         ← Step 8 output
+alignment_result_unnormalized_in_house_pipeline.csv
+DNA_threshold_for_samples.pdf                             ← inspect this in step 4
+samplesheet.yaml                                          ← copy of your input; edit in step 5
+step9_rendered.R                                          ← the actual R that ran (for the bioinformatician path)
+ovca_sensor_activity_result_concise.csv                   ← preliminary activity table
+ovca_sensor_activity_result_all.csv
+THRESHOLDS_DEFAULT                                        ← marker file (deleted automatically once you tune)
+```
+
+The `THRESHOLDS_DEFAULT` marker is your reminder: this run used defaults — treat the activity table as preliminary.
+
+### Step 4 — Inspect the DNA distribution PDF
+
+Open `runs/<date>/DNA_threshold_for_samples.pdf`. You'll see one small plot per sample:
+
+- **X-axis**: DNA abundance (in units of the smallest DNA count for that sample)
+- **Y-axis**: fraction of barcodes that have any RNA reads at that DNA level
+
+For each sample, look for the X value where the curve **plateaus near 1.0**. That's your DNA threshold for that sample — the point at which DNA coverage is consistently high enough that absent RNA signal is meaningful (rather than just under-sequencing).
+
+Write down a threshold per sample. Typical published values range from 2 (high-coverage) to 30+ (low-coverage).
+
+### Step 5 — Tune thresholds and re-run Step 9 only
+
+Open `runs/<date>/samplesheet.yaml` (the **copy in the run dir**, not your input). Add `dna_threshold` to each row using the values you decided in step 4. Save.
+
+Then re-run Step 9 — replace `2026-05-04` with your actual date dir name:
+
+**macOS / Linux:**
 
 ```bash
-trend dashboard --runs ./runs/
+docker run --rm \
+  -v "$(pwd)/runs:/data/runs" \
+  ghcr.io/syntheticimmunity/trend-dashboard:latest \
+  trend run --resume /data/runs/2026-05-04 --rerun-from step9
 ```
 
-Open http://localhost:8000. The new run appears under the Pipeline tab's history. To make your own activity table show up on the **Results** page (with strip plot, sortable selective-enhancer table, drill-down to PWMs and constructs, CSV download), follow **MANUAL.md § 7 step 4a** — it's a one-block config entry pointing the dashboard at your CSV.
+**Windows PowerShell:**
+
+```powershell
+docker run --rm `
+  -v "${PWD}/runs:/data/runs" `
+  ghcr.io/syntheticimmunity/trend-dashboard:latest `
+  trend run --resume /data/runs/2026-05-04 --rerun-from step9
+```
+
+This re-renders the R script with your new thresholds and runs Step 9 only — typically **~30 seconds to a few minutes** on full Lib4 data, depending on your machine. Vastly faster than re-running Steps 1-8 (the bowtie2 alignment, which is hours) — that's the whole point of the resume flow. **You can iterate this step as many times as you want** — change a threshold, re-run, inspect, change again. The runner removes the `THRESHOLDS_DEFAULT` marker automatically once every sample has an explicit threshold.
+
+Open the dashboard (`trend dashboard --runs ./runs/`) — your tuned activity table now appears in the Results page next to the bundled OvCa and T-cell projects.
+
+### For bioinformaticians: direct R control
+
+If you'd rather work in R interactively (RStudio, VS Code, or any R session) — perhaps because you want to tweak the contrast logic, add custom QC plots, or simply prefer the cell-by-cell flow the manuscript script was designed for — **skip step 5 entirely**.
+
+Open `runs/<date>/step9_rendered.R` in your R IDE. This file is the manuscript's Step-9 analysis script with **your sample names, your thresholds, your contrasts** already inlined as R variables at the top. It reads `alignment_result_*.csv` from the same directory and writes the activity tables there too.
+
+Run it line by line. Modify any line. Re-run any chunk. The same workflow the original manuscript author used in RStudio, applied to your experiment.
+
+### Common mistakes
+
+- **Editing the input `samplesheet.yaml` in step 5 instead of the copy in the run dir.** The runner uses the per-run copy. Edit the wrong one and your re-run will use the old defaults.
+- **Mismatched FASTQ basenames.** If `dna_fastq: OV8_Lib4_DNA_r1` is in your samplesheet but the actual file is `OV8_DNA_r1.fastq.gz` (no `_Lib4_`), the runner errors out at parse time. Rename the file or correct the samplesheet.
+- **Forgetting `--rerun-from step9` on iteration.** Without it, the runner triggers a full Steps 1-8 re-alignment (hours). The flag tells the runner "intermediate results are still valid; only redo Step 9."
 
 ### HPC / SLURM
 
-If your data is on a cluster, add `--profile slurm` to the `trend run` command. The cluster config lives in `pipeline/trend/workflow/profiles/slurm/`. See **MANUAL.md § 7 step 3** for details.
+If your data is on a cluster, add `--profile slurm` instead of `--profile snakemake` on the first run. The cluster config lives in `pipeline/trend/workflow/profiles/slurm/`.
 
 ---
 

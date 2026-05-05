@@ -86,27 +86,33 @@ You don't need this download for the bundled reproducibility checks under `trend
 ### Per-experiment loop
 
 ```bash
-# Scaffold a project from one of the bundled templates
+# 1. Scaffold a project from one of the bundled templates.
 trend init my-experiment --template ovarian_cancer     # or: T_cell_activation
 cd my-experiment
 
-# Edit the ONLY configuration you need to touch.
-# Per sample: id (must match FASTQ filename), fastq path, role (DNA|RNA),
-# condition, replicate_group, dna_threshold. Plus an analysis: block at the
-# bottom defining bc_threshold and the contrasts to compute.
+# 2. Edit samplesheet.yaml — one row per (cell_line, replicate) pair, with
+# dna_fastq + rna_fastq filenames matching your FASTQs (without .fastq.gz).
+# Leave dna_threshold blank for the first run; you'll come back after step 4.
 $EDITOR samplesheet.yaml
 
-# Run the 9-step pipeline (workstation, ~hours per 16 samples on 8 cores)
-trend run --inputs ./fastqs/ --output runs/$(date +%F)/
+# 3. First run: alignment (~hours) + Step 9 with default thresholds.
+# Outputs include a DNA_threshold_for_samples.pdf for inspection.
+trend run --inputs ./fastqs/ --output runs/$(date +%F)/ \
+  --samplesheet ./samplesheet.yaml --profile snakemake
 
-# Or on an HPC cluster — Snakemake handles SLURM submission for you
-trend run --inputs /scratch/fastqs/ --output runs/2026-04/ --profile slurm
+# 4. Inspect runs/<date>/DNA_threshold_for_samples.pdf, decide thresholds.
 
-# Browse results in the dashboard (any computer; doesn't need bowtie2 installed)
+# 5. Edit dna_threshold values in runs/<date>/samplesheet.yaml (the copy in
+# the run dir, not your input), then re-run only Step 9 (~minutes):
+trend run --resume runs/<date> --rerun-from step9
+
+# 6. Browse results in the dashboard.
 trend dashboard --runs ./runs/
+
+# HPC cluster: replace --profile snakemake with --profile slurm in step 3.
 ```
 
-For the full sample-sheet field reference, plus how to surface your own activity table on the Results page (strip plot, drill-downs, CSV export), see [`MANUAL.md`](MANUAL.md) § 7.
+For the full step-by-step walkthrough with Docker volume-mount commands for both bash/zsh and PowerShell, the inspect-and-tune iteration explained in detail, and the *For bioinformaticians: direct R control* path (open `step9_rendered.R` in RStudio), see [`REVIEWERS.md`](REVIEWERS.md) *Running TREND on your own data* or [`MANUAL.md`](MANUAL.md) § 7.
 
 Open `http://localhost:8000` to see the library composition panels (Figure 1A–E faithfully reproduced as interactive plots), the cancer-selectivity scatter (Figure 1F), and a sortable enhancer table.
 

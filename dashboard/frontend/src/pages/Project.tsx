@@ -46,16 +46,35 @@ export default function Project() {
       </section>
 
       <section className="mt-12 card">
-        <h2 className="text-card-title font-semibold">Adding your own project</h2>
+        <h2 className="text-card-title font-semibold">Running TREND on your own data</h2>
         <p className="mt-3 text-sm text-charcoal-82">
-          Use the <code className="font-mono">trend init</code> command to scaffold a
-          new project from one of the templates above:
+          Picking DNA thresholds is a human-in-the-loop step — you have to look at
+          per-sample DNA-coverage distributions before you can choose them sensibly.
+          The flow is iterative:
         </p>
-        <pre className="mt-4 overflow-x-auto rounded-comfortable border border-cream-border bg-cream p-4 text-xs">
-{`trend init my-experiment --template ovarian_cancer
-$EDITOR my-experiment/samplesheet.yaml
-trend run --inputs ./fastqs/ --output ./runs/$(date +%F)/`}
-        </pre>
+        <ol className="mt-3 list-decimal pl-5 text-sm text-charcoal-82 space-y-1">
+          <li>
+            <code className="font-mono text-xs">trend init my-experiment --template ovarian_cancer</code>
+            {" "}— scaffold a project; produces <code className="font-mono text-xs">samplesheet.yaml</code> pre-filled with the published OvCa example.
+          </li>
+          <li>
+            Edit <code className="font-mono text-xs">samplesheet.yaml</code> with your cell lines, replicate counts, and DNA/RNA FASTQ filenames. Leave <code className="font-mono text-xs">dna_threshold</code> blank.
+          </li>
+          <li>
+            Run <code className="font-mono text-xs">trend run --inputs ./fastqs --output ./runs/&lt;date&gt; --samplesheet ./my-experiment/samplesheet.yaml --profile snakemake</code>
+            {" "}— produces the alignment result, a preliminary activity table, and a per-sample DNA-distribution PDF.
+          </li>
+          <li>
+            Inspect <code className="font-mono text-xs">runs/&lt;date&gt;/DNA_threshold_for_samples.pdf</code> — pick the threshold per sample where each curve plateaus.
+          </li>
+          <li>
+            Edit <code className="font-mono text-xs">runs/&lt;date&gt;/samplesheet.yaml</code> (the dropped copy in the run dir), fill in <code className="font-mono text-xs">dna_threshold</code>, then re-run only Step 9 with{" "}
+            <code className="font-mono text-xs">trend run --resume ./runs/&lt;date&gt; --rerun-from step9</code>{" "}— takes ~minutes, not hours. Iterate until satisfied.
+          </li>
+        </ol>
+        <p className="mt-4 text-sm text-charcoal-82">
+          For the full walkthrough with copy-pasteable commands for both bash/zsh and PowerShell, including the Docker volume-mount form and the <em>For bioinformaticians: direct R control</em> path, see <strong>REVIEWERS.md</strong> § <em>Running TREND on your own data</em> or <strong>MANUAL.md</strong> § 7.
+        </p>
       </section>
     </div>
   );
