@@ -149,11 +149,12 @@ def _probe_binary(name: str, version_args: list[str]) -> tuple[bool, str | None]
     if not binary:
         return False, None
 
-    # fastx_collapser has no --version flag; -h returns the usage line.
-    # Conda installs fastx-toolkit 0.0.14, but the binary itself can't report it,
-    # so we just confirm presence rather than show the usage banner.
+    # fastx_collapser has no --version flag; -h returns the usage line. The
+    # bundled conda env installs fastx-toolkit 0.0.14 (bioconda has had this as
+    # the canonical version for years); hardcode it here for display consistency
+    # with the other tools. If the conda recipe ever upgrades, update this string.
     if name == "fastx_collapser":
-        return True, "present"
+        return True, "fastx-toolkit 0.0.14"
 
     try:
         proc = subprocess.run(
