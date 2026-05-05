@@ -1,9 +1,16 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
-import { api, type ExampleTier, type OracleFileResult, type OracleReport } from "@/lib/api";
+import {
+  api,
+  runExampleStream,
+  type ExampleTier,
+  type OracleFileResult,
+  type OracleReport,
+} from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { StateMachine, type StepState } from "@/components/StateMachine";
 
 interface TierSpec {
   id: ExampleTier;
@@ -88,12 +95,56 @@ function ResultCard({ r }: { r: OracleFileResult }) {
 export default function RunExample() {
   const [tier, setTier] = useState<ExampleTier>("pipeline");
   const [report, setReport] = useState<OracleReport | null>(null);
-  const mutation = useMutation({
-    mutationFn: (chosenTier: ExampleTier) => api.runExample("ovarian_cancer", chosenTier),
-    onSuccess: setReport,
+  const [running, setRunning] = useState(false);
+  const [stepState, setStepState] = useState<Record<string, StepState>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: stepsData } = useQuery({
+    queryKey: ["pipeline-steps"],
+    queryFn: api.pipelineSteps,
   });
 
   const tierSpec = TIERS.find((t) => t.id === tier)!;
+
+  async function handleRun() {
+    setRunning(true);
+    setReport(null);
+    setError(null);
+    setStepState({});
+
+    try {
+      await runExampleStream("ovarian_cancer", tier, (event) => {
+        if (event.event === "run_started") {
+          const active = (event.active_steps as string[]) || [];
+          const skipped = (event.skipped_steps as string[]) || [];
+          const initial: Record<string, StepState> = {};
+          for (const sid of active) initial[sid] = { status: "pending" };
+          for (const sid of skipped) initial[sid] = { status: "skipped" };
+          setStepState(initial);
+        } else if (event.event === "step_started") {
+          const id = String(event.step_id);
+          setStepState((prev) => ({
+            ...prev,
+            [id]: { ...prev[id], status: "running" },
+          }));
+        } else if (event.event === "step_finished") {
+          const id = String(event.step_id);
+          setStepState((prev) => ({
+            ...prev,
+            [id]: { ...prev[id], status: (event.status as StepState["status"]) || "completed" },
+          }));
+        } else if (event.event === "report") {
+          setReport(event.payload as OracleReport);
+        }
+      });
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const showStateMachine = tier === "pipeline" && (running || Object.keys(stepState).length > 0);
 
   return (
     <div className="mx-auto max-w-[1200px] px-6 py-16">
@@ -115,9 +166,11 @@ export default function RunExample() {
               key={t.id}
               type="button"
               onClick={() => setTier(t.id)}
+              disabled={running}
               className={cn(
                 "card text-left transition-shadow",
                 isActive ? "shadow-focus border-charcoal" : "hover:shadow-focus",
+                running && "opacity-60 cursor-not-allowed",
               )}
             >
               <div className="flex items-baseline justify-between gap-2">
@@ -147,21 +200,28 @@ export default function RunExample() {
 
       <div className="mt-8 flex flex-wrap items-center gap-4">
         <button
-          onClick={() => mutation.mutate(tier)}
-          disabled={mutation.isPending}
+          onClick={handleRun}
+          disabled={running}
           className="btn-primary"
         >
-          {mutation.isPending ? "Running…" : `Run ${tierSpec.title.toLowerCase()}`}
+          {running ? "Running…" : `Run ${tierSpec.title.toLowerCase()}`}
         </button>
-        <Link to="/results" className="btn-ghost">
+        <Link to="/results" className="btn-ghost no-underline">
           Browse published results →
         </Link>
       </div>
 
-      {mutation.error && (
+      {error && (
         <div className="mt-6 card border-charcoal-40">
-          <p className="text-sm text-charcoal-82">{String(mutation.error)}</p>
+          <p className="text-sm text-charcoal-82">{error}</p>
         </div>
+      )}
+
+      {showStateMachine && stepsData && (
+        <section className="mt-12">
+          <h2 className="text-card-title font-semibold mb-4">Pipeline progress</h2>
+          <StateMachine steps={stepsData.steps} state={stepState} />
+        </section>
       )}
 
       {report && (

@@ -33,7 +33,7 @@ from backend import __version__, config, preflight
 from backend.library import queries
 from backend.library.pwms import load_pwms
 from backend.library.summary import SummaryNotBuilt, load_summary
-from backend.oracle.run_example import run_oracle
+from backend.oracle.run_example import run_oracle, run_oracle_streaming
 from backend.pipeline import error_hints, runner
 from backend.schemas import _loader as schema_loader
 
@@ -449,6 +449,39 @@ def run_example(
         "file_results": report.file_results,
         "notes": report.notes,
     }
+
+
+@app.post("/run/example/stream")
+def run_example_stream(
+    project: str = Query(default="ovarian_cancer"),
+    tier: str = Query(default="pipeline", pattern="^(smoke|step9|pipeline)$"),
+):
+    """Streaming reviewer oracle.
+
+    Same three tiers as /run/example, but emits per-step events for the
+    'pipeline' tier so the install-check page can drive an animated state
+    machine while the snakemake DAG runs. Smoke and step9 tiers emit a
+    single 'report' event so the consumer can be uniform.
+    """
+    iterator = run_oracle_streaming(project=project, tier=tier)
+
+    async def event_source():
+        loop = asyncio.get_running_loop()
+        sentinel = object()
+
+        def _next():
+            try:
+                return next(iterator)
+            except StopIteration:
+                return sentinel
+
+        while True:
+            event = await loop.run_in_executor(None, _next)
+            if event is sentinel:
+                break
+            yield {"event": event.get("event", "message"), "data": _json.dumps(event)}
+
+    return EventSourceResponse(event_source())
 
 
 _PWM_VERSION_SUFFIX = __import__("re").compile(r"_v\d+$")

@@ -407,13 +407,37 @@ export async function startRun(
   body: RunStartRequest,
   onEvent: (event: { event: string } & Record<string, unknown>) => void,
 ): Promise<void> {
-  const res = await fetch("/run/start", {
+  await consumeSSE("/run/start", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
     body: JSON.stringify(body),
-  });
+  }, onEvent);
+}
+
+/**
+ * SSE consumer for /run/example/stream. Used by the install-check pipeline
+ * tier to drive the animated state machine while snakemake runs.
+ */
+export async function runExampleStream(
+  project: string,
+  tier: ExampleTier,
+  onEvent: (event: { event: string } & Record<string, unknown>) => void,
+): Promise<void> {
+  const qs = `project=${encodeURIComponent(project)}&tier=${encodeURIComponent(tier)}`;
+  await consumeSSE(`/run/example/stream?${qs}`, {
+    method: "POST",
+    headers: { Accept: "text/event-stream" },
+  }, onEvent);
+}
+
+async function consumeSSE(
+  url: string,
+  init: RequestInit,
+  onEvent: (event: { event: string } & Record<string, unknown>) => void,
+): Promise<void> {
+  const res = await fetch(url, init);
   if (!res.ok || !res.body) {
-    throw new Error(`Run failed to start: ${res.status} ${res.statusText}`);
+    throw new Error(`SSE failed: ${res.status} ${res.statusText}`);
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -421,9 +445,8 @@ export async function startRun(
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
-    // sse-starlette emits CRLF line endings; the SSE frame-separator we
-    // look for below is the spec-standard "\n\n", which won't match the
-    // CRLF "\r\n\r\n" in raw form. Strip CRs so the parsing works.
+    // sse-starlette emits CRLF line endings; strip CRs so the SSE frame
+    // separator "\n\n" matches in raw form (was "\r\n\r\n").
     buf += decoder.decode(value, { stream: true }).replace(/\r/g, "");
     let idx: number;
     while ((idx = buf.indexOf("\n\n")) >= 0) {
