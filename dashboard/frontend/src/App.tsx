@@ -22,7 +22,7 @@ const NAV: { to: string; label: string }[] = [
   { to: "/results", label: "Results" },
   { to: "/project", label: "Projects" },
   // Review-period entry; remove with the route + import below + Reproduce.tsx.
-  { to: "/reproduce", label: "Reproduce manuscript" },
+  { to: "/reproduce", label: "Reproduce" },
   { to: "/glossary", label: "Glossary" },
   { to: "/health", label: "System" },
 ];
