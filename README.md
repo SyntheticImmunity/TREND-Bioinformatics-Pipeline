@@ -20,7 +20,12 @@ Pick the path matching your environment:
 
 #### Path A — Docker (easiest; zero dependency conflicts)
 
-**Prerequisite:** [Docker Desktop](https://docker.com/products/docker-desktop) installed on macOS or Windows (one-click installer); on Linux, the `docker` engine.
+**Prerequisite:** [Docker Desktop](https://docker.com/products/docker-desktop) installed and running on macOS or Windows (one-click installer); on Linux, the `docker` engine.
+
+**Where to run the commands below:**
+- **Windows** — open **PowerShell** or **Windows Terminal** (no WSL or bash setup required).
+- **macOS** — open **Terminal**.
+- **Linux** — any shell.
 
 ```bash
 docker pull ghcr.io/syntheticimmunity/trend-dashboard:latest

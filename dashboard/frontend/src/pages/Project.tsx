@@ -48,22 +48,19 @@ export default function Project() {
       <section className="mt-12 card">
         <h2 className="text-card-title font-semibold">Running TREND on your own data</h2>
         <p className="mt-3 text-sm text-charcoal-82">
-          Picking DNA thresholds is a human-in-the-loop step. You run the
-          pipeline once with default thresholds, inspect the per-sample
-          DNA-coverage PDF that comes out, fill in tuned thresholds, then
-          re-run only Step 9 — minutes, not hours. Iterate until satisfied.
-        </p>
-        <p className="mt-3 text-sm text-charcoal-82">
-          The full walkthrough has copy-pasteable bash and PowerShell commands
-          for the Docker and bioinformatician-direct paths, plus the sample
-          sheet template.
+          The bundled analyses are starting templates — TREND extends to your
+          own cell lines, donor cohorts, or experimental contrasts. The
+          typical flow: scaffold a project with your sample design, run the
+          pipeline once, inspect the diagnostics it produces, tune parameters
+          in the sample sheet, and re-run just the affected analysis step.
+          Minutes per iteration.
         </p>
         <div className="mt-5">
           <a
             href="https://github.com/SyntheticImmunity/TREND-Bioinformatics-Pipeline/blob/main/REVIEWERS.md#running-trend-on-your-own-data"
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-primary inline-block"
+            className="btn-ghost no-underline"
           >
             Read the full walkthrough →
           </a>
