@@ -460,7 +460,7 @@ def run_example(
 @app.post("/run/example/stream")
 def run_example_stream(
     project: str = Query(default="ovarian_cancer"),
-    tier: str = Query(default="pipeline", pattern="^(smoke|step9|pipeline)$"),
+    tier: str = Query(default="install_check", pattern="^(smoke|step9|pipeline|install_check)$"),
 ):
     """Streaming reviewer oracle.
 

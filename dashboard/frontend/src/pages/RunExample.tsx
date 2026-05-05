@@ -1,45 +1,15 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import {
-  api,
   runExampleStream,
   type ExampleTier,
   type OracleFileResult,
   type OracleReport,
 } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { StateMachine, type StepState } from "@/components/StateMachine";
 
-interface TierSpec {
-  id: ExampleTier;
-  title: string;
-  blurb: string;
-  expectedRuntime: string;
-  requirements: string;
-  recommended?: boolean;
-}
-
-const TIERS: TierSpec[] = [
-  {
-    id: "pipeline",
-    title: "End-to-end install check",
-    blurb:
-      "Runs the full pipeline (Steps 1–9) on simulated FASTQs and confirms the post-alignment count matrix matches the analytically-computed expected values. Validates the entire alignment + analysis stack inside your install: bowtie2, cutadapt, samtools, fastx-toolkit, and R. If this passes, you can trust the image on your own FASTQs.",
-    expectedRuntime: "~3 minutes",
-    requirements: "Full conda environment (everything is already bundled in the Docker image).",
-    recommended: true,
-  },
-  {
-    id: "step9",
-    title: "Analysis-only check",
-    blurb:
-      "Re-runs Step 9 (the R analysis script) on a 1,000-promoter slice of published OvCa alignment data and confirms the activity output matches our published table row-for-row. Use this if you only plan to re-analyze existing count tables — it skips the upstream alignment stack.",
-    expectedRuntime: "~30 seconds",
-    requirements: "R + tidyverse + gridExtra.",
-  },
-];
+const INSTALL_CHECK_TIER: ExampleTier = "install_check";
 
 function ResultCard({ r }: { r: OracleFileResult }) {
   return (
@@ -93,178 +63,113 @@ function ResultCard({ r }: { r: OracleFileResult }) {
 }
 
 export default function RunExample() {
-  const [tier, setTier] = useState<ExampleTier>("pipeline");
   const [report, setReport] = useState<OracleReport | null>(null);
   const [running, setRunning] = useState(false);
-  const [stepState, setStepState] = useState<Record<string, StepState>>({});
+  const [stage, setStage] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-
-  const { data: stepsData } = useQuery({
-    queryKey: ["pipeline-steps"],
-    queryFn: api.pipelineSteps,
-  });
-
-  const tierSpec = TIERS.find((t) => t.id === tier)!;
 
   async function handleRun() {
     setRunning(true);
     setReport(null);
     setError(null);
-    setStepState({});
+    setStage("Starting…");
 
     try {
-      await runExampleStream("ovarian_cancer", tier, (event) => {
-        if (event.event === "run_started") {
-          const active = (event.active_steps as string[]) || [];
-          // Only seed state for steps this tier actually exercises. Steps
-          // outside the install-check fixture (1, 3, 9 for the pipeline
-          // tier) are intentionally not part of this run; they stay
-          // visible in the Pipeline reference section above. Showing them
-          // as "skipped" in the progress view reads as a failure.
-          const initial: Record<string, StepState> = {};
-          for (const sid of active) initial[sid] = { status: "pending" };
-          setStepState(initial);
-        } else if (event.event === "step_started") {
-          const id = String(event.step_id);
-          setStepState((prev) => ({
-            ...prev,
-            [id]: { ...prev[id], status: "running" },
-          }));
-        } else if (event.event === "step_finished") {
-          const id = String(event.step_id);
-          setStepState((prev) => ({
-            ...prev,
-            [id]: { ...prev[id], status: (event.status as StepState["status"]) || "completed" },
-          }));
-        } else if (event.event === "report") {
-          setReport(event.payload as OracleReport);
+      await runExampleStream("ovarian_cancer", INSTALL_CHECK_TIER, (event) => {
+        switch (event.event) {
+          case "run_started":
+            setStage("Phase 1 — running pipeline against simulated FASTQs (~3 min)");
+            break;
+          case "step_started": {
+            const sid = String(event.step_id);
+            if (sid === "step_9_enhancer_activity") {
+              setStage("Phase 2 — running Step 9 R analysis (~30 s)");
+            }
+            break;
+          }
+          case "step_finished": {
+            const sid = String(event.step_id);
+            if (sid === "step_8_count_barcodes") {
+              setStage("Phase 1 complete; preparing Step 9…");
+            } else if (sid === "step_9_enhancer_activity") {
+              setStage("Comparing outputs…");
+            }
+            break;
+          }
+          case "report":
+            setReport(event.payload as OracleReport);
+            break;
         }
       });
     } catch (e) {
       setError(String(e));
     } finally {
       setRunning(false);
+      setStage("");
     }
   }
 
-  const showStateMachine = tier === "pipeline" && (running || Object.keys(stepState).length > 0);
-
   return (
     <div className="mx-auto max-w-[1200px] px-6 py-16">
-      <h1 className="text-display-section font-semibold tracking-tight">Pipeline</h1>
+      <h1 className="text-display-section font-semibold tracking-tight">Install check</h1>
       <p className="mt-4 max-w-2xl text-muted">
-        TREND processes raw sequencing reads through nine ordered steps:
-        demultiplexing, barcode extraction, alignment to the Lib4 reference,
-        and per-promoter enhancer-activity quantification. Below: each step's
-        purpose and tool, then an install check that exercises the stack on
-        bundled data.
+        Confirms your install can run TREND end-to-end across all nine pipeline
+        steps and reproduces the published outputs. Run this once after
+        installation; no further check is needed before bringing your own data.
       </p>
 
-      {stepsData && (
-        <section className="mt-12">
-          <h2 className="text-card-title font-semibold mb-4">Pipeline reference</h2>
-          <ol className="space-y-3">
-            {stepsData.steps.map((step, idx) => (
-              <li
-                key={step.id}
-                className="flex items-start gap-4 rounded-card border border-cream-border bg-cream p-4"
-              >
-                <span className="font-mono text-xs text-muted tabular-nums pt-1">
-                  {String(idx + 1).padStart(2, "0")}
-                </span>
-                <div className="flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <h4 className="font-semibold text-charcoal">{step.name}</h4>
-                    {step.optional && (
-                      <span className="text-xs text-muted">(optional)</span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-sm text-charcoal-82">{step.short_purpose}</p>
-                  <p className="mt-2 text-xs text-muted font-mono">{step.tool}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
-
-      <section className="mt-16">
-        <h2 className="text-card-title font-semibold">Install check</h2>
-        <p className="mt-3 max-w-2xl text-sm text-charcoal-82">
-          Confirm your install reproduces our published outputs before running
-          on your own data. The recommended check runs the full pipeline
-          end-to-end on a small simulated dataset; if it matches the expected
-          outputs, your install is good to go.
+      <section className="mt-12 card">
+        <div className="flex items-baseline justify-between gap-4 flex-wrap">
+          <h2 className="text-card-title font-semibold">End-to-end install check</h2>
+          <span className="text-xs text-muted">~3–4 minutes total</span>
+        </div>
+        <p className="mt-3 text-sm text-charcoal-82">
+          Runs both phases of the pipeline back-to-back and reports a
+          single result.
         </p>
+        <ul className="mt-4 space-y-2 text-sm text-charcoal-82 list-disc pl-5">
+          <li>
+            <strong>Phase 1 — Steps 2–8 (alignment + count tables).</strong>{" "}
+            Snakemake on a small simulated FASTQ fixture; produces the
+            post-alignment count matrix and verifies it matches the
+            analytically-computed expected values. Validates bowtie2,
+            cutadapt, samtools, fastx-toolkit, and the count-table R script.
+          </li>
+          <li>
+            <strong>Phase 2 — Step 9 (enhancer-activity quantification).</strong>{" "}
+            R + tidyverse on a 1,000-promoter slice of real OvCa alignment
+            data; verifies the activity table matches the published values
+            row-for-row. Validates the per-project Step 9 R script.
+          </li>
+        </ul>
+        <p className="mt-3 text-xs text-muted">
+          For the full-data manuscript reproduction (the deposited 57k-promoter
+          tables), use the <em>Reproduce this analysis</em> buttons on the{" "}
+          <Link to="/project" className="underline">Projects</Link> page.
+        </p>
+
+        <div className="mt-6 flex flex-wrap items-center gap-4">
+          <button
+            onClick={handleRun}
+            disabled={running}
+            className="btn-primary"
+          >
+            {running ? "Running…" : "Run install check"}
+          </button>
+          <Link to="/results" className="btn-ghost no-underline">
+            Browse published results →
+          </Link>
+        </div>
+
+        {running && stage && (
+          <p className="mt-4 text-sm text-charcoal-82">{stage}</p>
+        )}
       </section>
-
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
-        {TIERS.map((t) => {
-          const isActive = t.id === tier;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTier(t.id)}
-              disabled={running}
-              className={cn(
-                "card text-left transition-shadow",
-                isActive ? "shadow-focus border-charcoal" : "hover:shadow-focus",
-                running && "opacity-60 cursor-not-allowed",
-              )}
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <h3 className="text-card-title font-semibold">{t.title}</h3>
-                {t.recommended && (
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide whitespace-nowrap",
-                      isActive ? "bg-charcoal text-cream-light" : "bg-charcoal-3 text-muted",
-                    )}
-                  >
-                    Recommended
-                  </span>
-                )}
-              </div>
-              <p className="mt-3 text-sm text-charcoal-82">{t.blurb}</p>
-              <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-muted">
-                <span>Runtime</span>
-                <span className="text-charcoal-82">{t.expectedRuntime}</span>
-                <span>Needs</span>
-                <span className="text-charcoal-82">{t.requirements}</span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-8 flex flex-wrap items-center gap-4">
-        <button
-          onClick={handleRun}
-          disabled={running}
-          className="btn-primary"
-        >
-          {running ? "Running…" : `Run ${tierSpec.title.toLowerCase()}`}
-        </button>
-        <Link to="/results" className="btn-ghost no-underline">
-          Browse published results →
-        </Link>
-      </div>
 
       {error && (
         <div className="mt-6 card border-charcoal-40">
           <p className="text-sm text-charcoal-82">{error}</p>
         </div>
-      )}
-
-      {showStateMachine && stepsData && (
-        <section className="mt-12">
-          <h2 className="text-card-title font-semibold mb-4">Pipeline progress</h2>
-          <StateMachine
-            steps={stepsData.steps.filter((s) => stepState[s.id] !== undefined)}
-            state={stepState}
-          />
-        </section>
       )}
 
       {report && (
@@ -286,16 +191,11 @@ export default function RunExample() {
               {report.overall_pass ? "all match" : "differences found"}
             </span>
             <div>
-              <h2 className="text-card-title font-semibold">
-                {report.project === "ovarian_cancer" ? "Ovarian cancer" : "T-cell activation"}
-                <span className="ml-2 text-sm font-normal text-muted">
-                  · {TIERS.find((t) => t.id === report.tier)?.title}
-                </span>
-              </h2>
+              <h2 className="text-card-title font-semibold">Install check result</h2>
               <p className="text-sm text-muted mt-1">
                 {report.mode === "real"
-                  ? `Live re-run · completed in ${report.runtime_seconds.toFixed(2)}s`
-                  : `Reference comparison · completed in ${report.runtime_seconds.toFixed(2)}s`}
+                  ? `Live re-run · completed in ${report.runtime_seconds.toFixed(2)} s`
+                  : `Reference comparison · completed in ${report.runtime_seconds.toFixed(2)} s`}
               </p>
             </div>
           </div>

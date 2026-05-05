@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 import { runReproduceStream, reproduceDownloadUrl } from "@/lib/api";
-import { cn } from "@/lib/cn";
 
 type ProjectKey = "ovarian_cancer" | "T_cell_activation";
 
@@ -57,7 +56,24 @@ function formatMB(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
 }
 
-function ReproduceCard({ spec }: { spec: ProjectCardSpec }) {
+function ProjectInfoCard({ spec }: { spec: ProjectCardSpec }) {
+  return (
+    <article className="card">
+      <h2 className="text-card-title font-semibold">{spec.title}</h2>
+      <p className="mt-3 text-sm text-charcoal-82">{spec.blurb}</p>
+      <dl className="mt-6 grid grid-cols-2 gap-y-2 text-xs">
+        {spec.metadata.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-muted">{label}</dt>
+            <dd className="font-mono text-charcoal-82">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </article>
+  );
+}
+
+function ReproduceMini({ spec }: { spec: ProjectCardSpec }) {
   const [state, setState] = useState<ReproduceState>({ status: "idle" });
 
   async function handleRun() {
@@ -131,145 +147,121 @@ function ReproduceCard({ spec }: { spec: ProjectCardSpec }) {
   const reset = () => setState({ status: "idle" });
 
   return (
-    <article className="card">
-      <h2 className="text-card-title font-semibold">{spec.title}</h2>
-      <p className="mt-3 text-sm text-charcoal-82">{spec.blurb}</p>
-      <dl className="mt-6 grid grid-cols-2 gap-y-2 text-xs">
-        {spec.metadata.map(([label, value]) => (
-          <div key={label} className="contents">
-            <dt className="text-muted">{label}</dt>
-            <dd className="font-mono text-charcoal-82">{value}</dd>
-          </div>
-        ))}
-      </dl>
-
-      <div className="mt-6 border-t border-cream-border pt-5">
+    <div className="rounded-card border border-cream-border bg-cream p-4">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <h4 className="font-semibold text-charcoal text-sm">{spec.title}</h4>
         {state.status === "idle" && (
           <button
             type="button"
             onClick={() => setState({ status: "confirming" })}
-            className="btn-ghost no-underline w-full"
+            className="text-xs underline text-charcoal-82"
           >
-            Reproduce this analysis
+            Reproduce →
           </button>
         )}
+      </div>
 
-        {state.status === "confirming" && (
-          <div>
-            <p className="text-sm text-charcoal-82">
-              First run downloads the post-alignment count tables
-              (~{spec.approxDownloadMB} MB) from GitHub, then runs the
-              manuscript's Step 9 R script (~3–5 min). The result will be a
-              CSV you can compare manually against our deposited copy.
-            </p>
-            <div className="mt-4 flex gap-3">
-              <button
-                type="button"
-                onClick={handleRun}
-                className="btn-primary"
-              >
-                Download and run
-              </button>
-              <button
-                type="button"
-                onClick={reset}
-                className="btn-ghost no-underline"
-              >
-                Cancel
-              </button>
-            </div>
+      {state.status === "confirming" && (
+        <div className="mt-3 text-xs">
+          <p className="text-charcoal-82">
+            First run downloads ~{spec.approxDownloadMB} MB from GitHub, then
+            runs the manuscript's Step 9 R script (~3–5 min).
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={handleRun}
+              className="btn-primary text-xs px-3 py-1"
+            >
+              Download and run
+            </button>
+            <button
+              type="button"
+              onClick={reset}
+              className="text-xs underline text-charcoal-82"
+            >
+              Cancel
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {state.status === "running" && (
-          <div className="text-sm">
-            <p className="text-charcoal-82">{state.stage}</p>
-            {state.currentFile && (
-              <p className="mt-1 text-xs text-muted font-mono break-all">
-                {state.currentFile}
-              </p>
-            )}
-            {state.downloadedBytes !== undefined && (
-              <p className="mt-1 text-xs text-muted tabular-nums">
-                {formatMB(state.downloadedBytes)}
-                {state.totalBytes ? ` / ${formatMB(state.totalBytes)}` : ""}
-              </p>
-            )}
-          </div>
-        )}
+      {state.status === "running" && (
+        <div className="mt-3 text-xs">
+          <p className="text-charcoal-82">{state.stage}</p>
+          {state.currentFile && (
+            <p className="mt-1 text-muted font-mono break-all">{state.currentFile}</p>
+          )}
+          {state.downloadedBytes !== undefined && (
+            <p className="mt-1 text-muted tabular-nums">
+              {formatMB(state.downloadedBytes)}
+              {state.totalBytes ? ` / ${formatMB(state.totalBytes)}` : ""}
+            </p>
+          )}
+        </div>
+      )}
 
-        {state.status === "done" && (
-          <div className="text-sm">
-            <p className="text-charcoal-82">
-              <span className="font-semibold">Run complete</span>
-              {state.runtimeSeconds !== undefined && (
-                <span className="text-muted">
-                  {" "}— Step 9 finished in {state.runtimeSeconds.toFixed(0)} s.
-                </span>
-              )}
-            </p>
-            <p className="mt-2 text-xs text-muted">
-              Download both files and compare with your tool of choice
-              (<code>diff</code>, pandas, R). The dashboard does not assert
-              a match — you decide.
-            </p>
-            <ul className="mt-4 space-y-3">
-              {(state.producedFiles ?? []).map((filename) => (
-                <li
-                  key={filename}
-                  className="rounded-card border border-cream-border bg-cream p-3"
-                >
-                  <div className="font-mono text-xs text-charcoal-82 break-all">
-                    {filename}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-3 text-xs">
+      {state.status === "done" && (
+        <div className="mt-3 text-xs">
+          <p className="text-charcoal-82">
+            <span className="font-semibold">Run complete</span>
+            {state.runtimeSeconds !== undefined && (
+              <span className="text-muted">
+                {" "}— {state.runtimeSeconds.toFixed(0)} s.
+              </span>
+            )}
+          </p>
+          <ul className="mt-3 space-y-2">
+            {(state.producedFiles ?? []).map((filename) => (
+              <li key={filename}>
+                <div className="font-mono text-muted break-all">{filename}</div>
+                <div className="mt-1 flex flex-wrap gap-3">
+                  <a
+                    href={reproduceDownloadUrl(spec.key, "produced", filename)}
+                    download={`produced__${filename}`}
+                    className="underline"
+                  >
+                    Produced ↓
+                  </a>
+                  {state.depositedFiles?.includes(filename) && (
                     <a
-                      href={reproduceDownloadUrl(spec.key, "produced", filename)}
-                      download={`produced__${filename}`}
+                      href={reproduceDownloadUrl(spec.key, "deposited", filename)}
+                      download={`deposited__${filename}`}
                       className="underline"
                     >
-                      Produced just now ↓
+                      Deposited ↓
                     </a>
-                    {state.depositedFiles?.includes(filename) && (
-                      <a
-                        href={reproduceDownloadUrl(spec.key, "deposited", filename)}
-                        download={`deposited__${filename}`}
-                        className="underline"
-                      >
-                        Deposited (in repository) ↓
-                      </a>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              onClick={reset}
-              className="mt-4 text-xs text-muted underline"
-            >
-              Reset
-            </button>
-          </div>
-        )}
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={reset}
+            className="mt-3 underline text-muted"
+          >
+            Reset
+          </button>
+        </div>
+      )}
 
-        {state.status === "error" && (
-          <div className="text-sm">
-            <p className="text-charcoal-82">
-              <span className="font-semibold">Run failed.</span>{" "}
-              <span className="text-muted">{state.error}</span>
-            </p>
-            <button
-              type="button"
-              onClick={reset}
-              className={cn("mt-3 btn-ghost no-underline")}
-            >
-              Reset
-            </button>
-          </div>
-        )}
-      </div>
-    </article>
+      {state.status === "error" && (
+        <div className="mt-3 text-xs">
+          <p className="text-charcoal-82">
+            <span className="font-semibold">Run failed.</span>{" "}
+            <span className="text-muted">{state.error}</span>
+          </p>
+          <button
+            type="button"
+            onClick={reset}
+            className="mt-2 underline text-muted"
+          >
+            Reset
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -284,39 +276,13 @@ export default function Project() {
         used for the published analysis.
       </p>
 
-      <section className="mt-12">
-        <h2 className="text-2xl font-semibold tracking-tight">
-          Reproducing the manuscript's results
-        </h2>
-        <p className="mt-3 max-w-3xl text-sm text-charcoal-82">
-          Click <em>Reproduce this analysis</em> on either project below.
-          On first click, the dashboard fetches the post-alignment count
-          tables from this repository's GitHub release, runs the manuscript's
-          unmodified Step 9 R script against them, and exposes both the
-          newly-produced CSV and the deposited reference CSV for download.
-          You compare them manually — the dashboard does not assert a match.
-        </p>
-        <p className="mt-2 max-w-3xl text-sm text-muted">
-          For the command-line equivalent (without the dashboard), see{" "}
-          <a
-            href="https://github.com/SyntheticImmunity/TREND-Bioinformatics-Pipeline/blob/main/REVIEWERS.md#reproducing-the-manuscripts-results"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline"
-          >
-            REVIEWERS.md
-          </a>
-          .
-        </p>
-
-        <div className="mt-6 grid gap-6 md:grid-cols-2">
-          {PROJECTS.map((spec) => (
-            <ReproduceCard key={spec.key} spec={spec} />
-          ))}
-        </div>
+      <section className="mt-12 grid gap-6 md:grid-cols-2">
+        {PROJECTS.map((spec) => (
+          <ProjectInfoCard key={spec.key} spec={spec} />
+        ))}
       </section>
 
-      <section className="mt-12 card">
+      <section className="mt-16 card">
         <h2 className="text-card-title font-semibold">Running TREND on your own data</h2>
         <p className="mt-3 text-sm text-charcoal-82">
           The bundled analyses are starting templates — TREND extends to your
@@ -336,6 +302,36 @@ export default function Project() {
             Read the full walkthrough →
           </a>
         </div>
+      </section>
+
+      <section className="mt-12">
+        <h2 className="text-card-title font-semibold">
+          Reproducing the manuscript's results
+        </h2>
+        <p className="mt-2 max-w-3xl text-sm text-charcoal-82">
+          For row-for-row verification of the deposited activity tables, click
+          <em> Reproduce</em> on either project below. The dashboard fetches
+          the count tables from this repository's GitHub release on first use,
+          runs the manuscript's unmodified Step 9 R script, and exposes both
+          the produced and deposited CSVs for download. Compare them manually.
+        </p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {PROJECTS.map((spec) => (
+            <ReproduceMini key={spec.key} spec={spec} />
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-muted">
+          Command-line equivalent:{" "}
+          <a
+            href="https://github.com/SyntheticImmunity/TREND-Bioinformatics-Pipeline/blob/main/REVIEWERS.md#reproducing-the-manuscripts-results"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline"
+          >
+            REVIEWERS.md § Reproducing the manuscript's results
+          </a>
+          .
+        </p>
       </section>
     </div>
   );

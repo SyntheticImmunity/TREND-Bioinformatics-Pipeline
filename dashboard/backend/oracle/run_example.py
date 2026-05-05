@@ -344,21 +344,161 @@ def _run_pipeline(project: str) -> OracleReport:
 # Streaming variant — yields per-step events as snakemake progresses
 # ---------------------------------------------------------------------------
 def run_oracle_streaming(
-    project: str = "ovarian_cancer", tier: str = "smoke",
+    project: str = "ovarian_cancer", tier: str = "install_check",
 ) -> Iterator[dict]:
     """Streaming wrapper around run_oracle.
 
-    For tier 'pipeline' yields per-step events as snakemake makes progress.
-    For tiers 'smoke' / 'step9' just yields a single 'report' event with the
-    synchronous result, so the SSE consumer can treat all tiers uniformly.
+    Tiers:
+      install_check : Steps 2-8 (snakemake on simulated FASTQs) +
+                      Step 9 (R on subsampled OvCa). The unified install
+                      check exposed by the dashboard.
+      pipeline      : Steps 2-8 only (legacy / CLI use).
+      smoke / step9 : single-tier non-streaming wrappers.
 
     Final event for every tier is `{"event": "report", "payload": {...}}`.
     """
-    if tier == "pipeline":
+    if tier == "install_check":
+        yield from _run_install_check_streaming(project)
+    elif tier == "pipeline":
         yield from _run_pipeline_streaming(project)
     else:
         report = run_oracle(project, tier)
         yield {"event": "report", "payload": dataclasses.asdict(report)}
+
+
+def _run_install_check_streaming(project: str) -> Iterator[dict]:
+    """Combined install check: pipeline (Steps 2-8) + Step 9 R analysis.
+
+    Phase 1 runs the snakemake DAG against bundled simulated FASTQs (validates
+    bowtie2/cutadapt/samtools/fastx + R for count tables).
+    Phase 2 runs Step 9 R script against the subsampled OvCa fixture (validates
+    R + tidyverse for activity quantification).
+
+    Yields step_started/step_finished events for each step in sequence and
+    a single combined `report` event at the end with file_results from
+    BOTH phases.
+    """
+    if project != "ovarian_cancer":
+        report = OracleReport(
+            project=project, tier="install_check", mode="stub",
+            overall_pass=False, runtime_seconds=0.0, file_results=[],
+            notes=["Combined install check is currently OvCa-only."],
+        )
+        yield {"event": "report", "payload": dataclasses.asdict(report)}
+        return
+
+    t0 = time.perf_counter()
+    pipeline_payload: dict | None = None
+    pipeline_active_steps: list[str] = []
+
+    # ---- Phase 1: pipeline (Steps 2-8) ----
+    # Consume events from _run_pipeline_streaming and re-yield. Augment
+    # run_started.active_steps to include step_9 so the frontend renders
+    # all 7 cards from the start. Intercept the final report event — we
+    # need to merge it with phase 2 before emitting our own.
+    for evt in _run_pipeline_streaming(project):
+        if evt.get("event") == "run_started":
+            pipeline_active_steps = list(evt.get("active_steps", []))
+            yield {
+                **evt,
+                "tier": "install_check",
+                "active_steps": pipeline_active_steps + ["step_9_enhancer_activity"],
+            }
+        elif evt.get("event") == "report":
+            pipeline_payload = evt.get("payload") or {}
+        else:
+            yield evt
+
+    if pipeline_payload is None:
+        # Should not happen; defensive.
+        report = OracleReport(
+            project=project, tier="install_check", mode="stub",
+            overall_pass=False, runtime_seconds=0.0, file_results=[],
+            notes=["Pipeline phase produced no result event."],
+        )
+        yield {"event": "report", "payload": dataclasses.asdict(report)}
+        return
+
+    pipeline_results = pipeline_payload.get("file_results", [])
+    pipeline_mode = pipeline_payload.get("mode", "stub")
+    pipeline_notes = pipeline_payload.get("notes", [])
+    pipeline_error = pipeline_payload.get("notes")  # already in notes
+
+    # ---- Phase 2: Step 9 (R on subsampled OvCa) ----
+    rscript = shutil.which("Rscript")
+    step9_results: list[dict] = []
+    step9_mode = "real"
+    step9_notes: list[str] = []
+
+    fixture_dir = EXAMPLES_DIR / "ovca_step9"
+    inputs_dir = fixture_dir / "inputs"
+    expected_dir = fixture_dir / "expected"
+
+    if not inputs_dir.exists() or not any(inputs_dir.glob("*.csv")):
+        step9_notes.append(
+            "Bundled Step-9 fixture not found (dashboard/example_data/ovca_step9). "
+            "Run `python tools/build_fixtures.py --tier t2` to regenerate."
+        )
+    elif not rscript:
+        step9_notes.append(
+            "Rscript not on PATH; skipping the Step 9 phase. Use the Docker "
+            "container to run the full check."
+        )
+    else:
+        yield {"event": "step_started", "step_id": "step_9_enhancer_activity"}
+        step9_paths = {
+            "inputs_dir": inputs_dir,
+            "expected_dir": expected_dir,
+            "step9_script": (
+                config.CODES_ROOT
+                / "3. Post_HPC_enhancer_activity_analysis_scripts"
+                / "code_by_projects" / "ovarian_cancer"
+                / "ovarian_cancer_specific_enhancer_screening_analysis.R"
+            ),
+            "metadata_csv": inputs_dir / "all_enhancer_metadata_111525.csv",
+            "outputs": [
+                "ovca_sensor_activity_result_concise.csv",
+                "ovca_sensor_activity_result_all.csv",
+            ],
+            "primary_key": "promoter_name",
+            "ordered": True,
+        }
+        try:
+            step9_actual_dir = _execute_step9(step9_paths)
+            step9_results = _compare_outputs(
+                step9_actual_dir, expected_dir,
+                step9_paths["outputs"], step9_paths,
+            )
+            yield {
+                "event": "step_finished",
+                "step_id": "step_9_enhancer_activity",
+                "status": "completed",
+            }
+        except Exception as exc:
+            log.exception("install_check: Step 9 phase failed")
+            step9_mode = "stub"
+            step9_notes.append(f"Step 9 invocation failed: {exc}")
+            yield {
+                "event": "step_finished",
+                "step_id": "step_9_enhancer_activity",
+                "status": "failed",
+            }
+
+    # ---- Combined report ----
+    combined_results = list(pipeline_results) + list(step9_results)
+    combined_mode = "real" if (pipeline_mode == "real" and step9_mode == "real") else "stub"
+    combined_notes = list(pipeline_notes) + list(step9_notes)
+    overall_pass = bool(combined_results) and all(
+        r.get("equivalent") for r in combined_results
+    )
+    report = OracleReport(
+        project=project, tier="install_check", mode=combined_mode,
+        overall_pass=overall_pass,
+        runtime_seconds=round(time.perf_counter() - t0, 2),
+        file_results=combined_results,
+        notes=combined_notes,
+    )
+    yield {"event": "report", "payload": dataclasses.asdict(report)}
 
 
 def _run_pipeline_streaming(project: str) -> Iterator[dict]:

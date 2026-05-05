@@ -146,7 +146,7 @@ export interface OracleFileResult {
   string_mismatches?: { column: string; row: number; actual: string; expected: string }[];
 }
 
-export type ExampleTier = "smoke" | "step9" | "pipeline";
+export type ExampleTier = "smoke" | "step9" | "pipeline" | "install_check";
 
 export interface OracleReport {
   project: string;
