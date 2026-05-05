@@ -1,4 +1,4 @@
-# Tier-2 example: Step-9 reproduction on real subsampled data
+# Step-9 reproduction fixture (real subsampled data)
 
 Bundled inputs are a stratified random sample of 1,000 promoters
 from the published ovarian cancer run. The expected outputs are the
@@ -13,5 +13,6 @@ the inputs and reproduce the expected outputs row-for-row:
     # produces ovca_sensor_activity_result_*.csv in cwd
     # compare to ../expected/
 
-The dashboard's `trend run --example step9` automates this and renders the
-diff as a green/red oracle badge.
+This fixture drives Phase 2 of the dashboard's *Install check* tab and the
+`trend run --example ovarian_cancer --tier step9` CLI command, both of which
+automate the diff and render it as a green/red pass-or-fail report.

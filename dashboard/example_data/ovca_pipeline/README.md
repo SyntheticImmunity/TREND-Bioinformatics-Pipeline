@@ -1,4 +1,4 @@
-# Tier-3 example: full FASTQ-to-activity reproduction on simulated data
+# End-to-end pipeline fixture (simulated FASTQs)
 
 Bundled inputs:
   - 50 promoters x 5 barcodes = 250 constructs from a Lib4 subsample
@@ -13,6 +13,7 @@ Expected outputs:
     barcode per sample, computed analytically from the planted read counts.
   - `alignment_result_unnormalized_in_house_pipeline.csv` — raw counts.
 
-A reviewer with the conda env active runs `trend run --example pipeline`,
-which invokes the bundled Snakefile against the FASTQs and compares the
-post-Step-8 outputs to the analytically-correct expected matrix.
+This fixture drives Phase 1 of the dashboard's *Install check* tab and the
+`trend run --example ovarian_cancer --tier pipeline` CLI command. Snakemake
+runs the bundled Snakefile against the FASTQs and compares the post-Step-8
+outputs to the analytically-correct expected matrix.
