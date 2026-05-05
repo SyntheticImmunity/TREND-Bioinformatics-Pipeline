@@ -89,6 +89,12 @@ def cmd_init(args: argparse.Namespace) -> int:
 # run
 # ---------------------------------------------------------------------------
 def cmd_run(args: argparse.Namespace) -> int:
+    # --resume <dir> --rerun-from step9: skip alignment, re-render and re-run
+    # the Step-9 R against the existing alignment outputs in <dir>. Used for
+    # fast threshold-tuning iteration after the user inspects the DNA-distribution PDF.
+    if args.resume and args.rerun_from == "step9":
+        return _cmd_rerun_step9(args)
+
     if trend.pipeline is None:
         print(
             "error: trend.pipeline backend is not importable. The CLI expects to "
@@ -133,6 +139,10 @@ def cmd_run(args: argparse.Namespace) -> int:
     if args.profile == "snakemake" or args.profile == "slurm":
         return _run_via_snakemake(inputs_dir, output_dir, args)
 
+    # Fall through: --profile local uses the dashboard-backend runner below.
+    # B-Slim samplesheet-driven Step 9 is wired to the snakemake/slurm path
+    # only; --profile local still uses the manuscript R script as-is.
+
     # Local execution path: invoke the existing runner directly.
     # Tell the dashboard backend to write manifests into the user's chosen
     # output directory rather than the dashboard's bundled runs/ tree.
@@ -165,7 +175,13 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def _run_via_snakemake(inputs_dir: Path, output_dir: Path, args: argparse.Namespace) -> int:
-    """Invoke Snakemake against the bundled workflow."""
+    """Invoke Snakemake against the bundled workflow.
+
+    If `args.samplesheet` (or an auto-discovered samplesheet.yaml) is supplied,
+    Snakemake is restricted to Steps 1-8 (alignment) and Step 9 is run
+    afterwards by the B-Slim samplesheet-driven renderer. Otherwise the
+    classic flow runs (Snakemake also handles Step 9 via the manuscript R).
+    """
     snakefile = Path(__file__).resolve().parent / "workflow" / "Snakefile"
     if not snakefile.exists():
         print(f"error: bundled Snakefile not found at {snakefile}", file=sys.stderr)
@@ -178,10 +194,21 @@ def _run_via_snakemake(inputs_dir: Path, output_dir: Path, args: argparse.Namesp
         )
         return 127
 
+    samplesheet_path, samplesheet = _resolve_samplesheet(args, inputs_dir)
+
     cmd = [
         "snakemake",
         "--snakefile", str(snakefile),
         "--directory", str(output_dir),
+    ]
+    if samplesheet is not None:
+        # B-Slim flow: ask Snakemake only for Step-8 alignment outputs; Step 9
+        # runs in Python below from the user's samplesheet.
+        cmd += [
+            "outputs/alignment_result_normalized_in_house_pipeline.csv",
+            "outputs/alignment_result_unnormalized_in_house_pipeline.csv",
+        ]
+    cmd += [
         "--config",
         f"inputs_dir={inputs_dir}",
         f"project={args.project}",
@@ -196,7 +223,117 @@ def _run_via_snakemake(inputs_dir: Path, output_dir: Path, args: argparse.Namesp
         cmd += ["--verbose"]
     print("running:", " ".join(cmd))
     import subprocess
-    return subprocess.call(cmd)
+    rc = subprocess.call(cmd)
+    if rc != 0 or args.dry_run:
+        return rc
+
+    if samplesheet is None:
+        # Backwards-compat: no samplesheet means Snakemake also ran Step 9
+        # with the manuscript R. Nothing more to do.
+        return 0
+
+    # B-Slim Step 9: render and run.
+    return _render_and_invoke_step9(samplesheet, samplesheet_path, output_dir)
+
+
+def _resolve_samplesheet(
+    args: argparse.Namespace, inputs_dir: Path,
+) -> tuple[Path | None, dict | None]:
+    """Find samplesheet.yaml from --samplesheet flag or by auto-discovery.
+
+    Returns (path, parsed_dict) or (None, None) if no samplesheet is found.
+    Auto-discovery searches: explicit --samplesheet flag, then
+    inputs_dir/../samplesheet.yaml, then ./samplesheet.yaml.
+    """
+    from .render_step9 import load_samplesheet
+
+    candidates: list[Path] = []
+    if getattr(args, "samplesheet", None):
+        candidates.append(Path(args.samplesheet).resolve())
+    candidates.append((inputs_dir.parent / "samplesheet.yaml").resolve())
+    candidates.append(Path.cwd() / "samplesheet.yaml")
+
+    for p in candidates:
+        if p.is_file():
+            try:
+                return p, load_samplesheet(p)
+            except Exception as exc:
+                print(f"warning: failed to parse {p}: {exc}", file=sys.stderr)
+    return None, None
+
+
+def _render_and_invoke_step9(
+    samplesheet: dict, samplesheet_path: Path | None, run_dir: Path,
+) -> int:
+    """Run B-Slim Step 9 in `run_dir`. Returns 0 on success, nonzero otherwise."""
+    from . import step9_runner
+
+    # Locate the design-metadata directory. In the bundled image / repo it is
+    # at codes/3. .../required_metadata/.
+    repo_root = Path(__file__).resolve().parents[2]
+    metadata_root = (
+        repo_root
+        / "codes"
+        / "3. Post_HPC_enhancer_activity_analysis_scripts"
+        / "required_metadata"
+    )
+    if not metadata_root.is_dir():
+        print(
+            f"error: design metadata directory not found: {metadata_root}",
+            file=sys.stderr,
+        )
+        return 3
+
+    if samplesheet_path is not None:
+        step9_runner.save_samplesheet_copy(samplesheet_path, run_dir)
+
+    print(f"running Step 9 from samplesheet (output -> {run_dir})")
+    result = step9_runner.render_and_run(samplesheet, run_dir, metadata_root)
+    print(f"  rendered R: {result.rendered_path}")
+    if result.used_default_thresholds:
+        print(
+            "  note: one or more samples had no dna_threshold; default of 3 was used.\n"
+            "        Inspect DNA_threshold_for_samples.pdf, edit samplesheet.yaml,\n"
+            f"        and re-run with: trend run --resume {run_dir} --rerun-from step9"
+        )
+    if result.rc != 0:
+        print(f"error: Step-9 R exited with code {result.rc}", file=sys.stderr)
+        if result.log_tail:
+            print(f"stderr tail:\n{result.log_tail}", file=sys.stderr)
+        return result.rc
+    if not result.output_files:
+        print(
+            "error: Step-9 R produced no *_sensor_activity_result_*.csv files.",
+            file=sys.stderr,
+        )
+        return 1
+    print("  outputs:")
+    for p in result.output_files:
+        print(f"    {p.name}")
+    return 0
+
+
+def _cmd_rerun_step9(args: argparse.Namespace) -> int:
+    """`--resume <dir> --rerun-from step9` — re-render and re-run Step 9 only."""
+    from .render_step9 import load_samplesheet
+
+    resume_dir = Path(args.resume).resolve()
+    if not resume_dir.is_dir():
+        print(f"error: --resume dir not found: {resume_dir}", file=sys.stderr)
+        return 2
+
+    samplesheet_path = resume_dir / "samplesheet.yaml"
+    if not samplesheet_path.is_file():
+        print(
+            f"error: no samplesheet.yaml in {resume_dir}. The original `trend run`\n"
+            f"       drops a samplesheet.yaml here; if missing, point --samplesheet\n"
+            f"       at your samplesheet explicitly.",
+            file=sys.stderr,
+        )
+        return 2
+
+    samplesheet = load_samplesheet(samplesheet_path)
+    return _render_and_invoke_step9(samplesheet, samplesheet_path, resume_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -344,6 +481,31 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_run.add_argument("--dry-run", action="store_true", help="Snakemake DAG dry-run; print what would happen.")
     p_run.add_argument("--verbose", "-v", action="store_true")
+    p_run.add_argument(
+        "--samplesheet",
+        help=(
+            "Path to samplesheet.yaml. If provided (or auto-discovered next to "
+            "--inputs), Step 9 is run from this samplesheet via the rendered R "
+            "template instead of the manuscript script's hardcoded sample list."
+        ),
+    )
+    p_run.add_argument(
+        "--resume",
+        help=(
+            "Path to a previous run directory. Combined with --rerun-from, "
+            "re-runs only the named stage against the existing outputs (e.g., "
+            "fast threshold tuning after inspecting the DNA-distribution PDF)."
+        ),
+    )
+    p_run.add_argument(
+        "--rerun-from",
+        choices=("step9",),
+        help=(
+            "Used with --resume: which stage to re-run. Currently only `step9` "
+            "is supported, which re-renders and re-runs the Step-9 R against "
+            "the already-produced alignment outputs."
+        ),
+    )
     p_run.set_defaults(func=cmd_run)
 
     p_dash = sub.add_parser("dashboard", help="Launch the web dashboard.")
