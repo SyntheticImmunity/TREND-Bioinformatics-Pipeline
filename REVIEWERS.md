@@ -185,7 +185,7 @@ For T-cell, swap `ovarian_cancer` → `T_cell_activation` and the script name to
 
 ### About numerical exactness
 
-We have verified, end-to-end via the bundled Docker image, that running the manuscript's published Step 9 R scripts against the full deposited count tables produces output that matches the deposited activity tables **bit-for-bit**: zero numeric mismatches across **3.8 million numeric cells** combined (OvCa + both T-cell donors), at the strictest possible tolerance (`rtol=0`, `atol=0`). This is the most stringent reproducibility guarantee a reviewer can ask for: bit-equivalent, not merely scientifically equivalent.
+We have verified, end-to-end via the bundled Docker image, that running the manuscript's published Step 9 R scripts against the full deposited count tables reproduces the deposited activity tables to every decimal place: zero numeric differences across **3.8 million numeric cells** combined (OvCa + both T-cell donors), at strict tolerance (`rtol=0`, `atol=0`).
 
 ---
 
