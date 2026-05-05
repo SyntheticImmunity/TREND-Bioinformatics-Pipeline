@@ -6,19 +6,26 @@ End-to-end pipeline + interactive dashboard for the TREND enhancer-screening pla
 
 **Prerequisite:** install [Docker Desktop](https://docker.com/products/docker-desktop) (macOS / Windows) or the `docker` engine (Linux), and **launch it** — Docker Desktop must be running before the commands below will work.
 
+> **Windows users — install as administrator.** Right-click the downloaded Docker Desktop installer and choose **Run as administrator** for the first install. Docker Desktop writes into protected system directories during setup, and the standard double-click path will fail with a permission error like `For security reasons C:\ProgramData\DockerDesktop must be owned by an elevated account`.
+
 **Open a terminal:**
 - **Windows** — **PowerShell** or **Windows Terminal** (no WSL or bash setup needed).
 - **macOS** — **Terminal** (Applications → Utilities → Terminal).
 - **Linux** — any shell.
 
-In the terminal, run:
+In the terminal, run the first command to download the image (~6.6 GB; runs once and is cached):
 
 ```bash
 docker pull ghcr.io/syntheticimmunity/trend-dashboard:latest
+```
+
+When that finishes, run the second command to start the dashboard:
+
+```bash
 docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
 ```
 
-The first command downloads the image (~6.6 GB; runs once and is cached). The second command starts the dashboard and prints `Uvicorn running on http://0.0.0.0:8000` when it's ready. **At that point, open [http://localhost:8000](http://localhost:8000) in your web browser.** Leave the terminal window open while you're using the dashboard; closing it stops the container.
+The terminal will print `Uvicorn running on http://0.0.0.0:8000` when it's ready. **At that point, open [http://localhost:8000](http://localhost:8000) in your web browser.** Leave the terminal window open while you're using the dashboard; closing it stops the container.
 
 The image bundles bowtie2, samtools, cutadapt, fastx-toolkit, R + tidyverse + Rsamtools, Python, all dependencies, the Lib4 alignment reference, and the pre-built dashboard frontend. Runs against the bundled OvCa + T-cell results immediately.
 
@@ -39,7 +46,7 @@ The image bundles bowtie2, samtools, cutadapt, fastx-toolkit, R + tidyverse + Rs
 | `pipeline/` | Snakemake workflow + the `trend` CLI (`init` / `run` / `dashboard` / `preflight`) |
 | `dashboard/` | FastAPI backend + React/Tailwind frontend |
 | `project_data/` | Bundled published outputs — OvCa & T-cell activity tables |
-| `codes/` | Manuscript's original scripts (UNCHANGED) |
+| `codes/` | Manuscript's original analysis scripts |
 | `references/` | Library metadata, TF taxonomy tables (Lambert / D'Alessio), curated breakdowns |
 | `scripts/` | Data-download helpers (`download_data.{sh,ps1}`) |
 | `tests/` · `tools/` | Automated equivalence tests, fixture builders, audit utilities |
@@ -64,16 +71,26 @@ Pick the path matching your environment:
 
 **Prerequisite:** [Docker Desktop](https://docker.com/products/docker-desktop) installed and running on macOS or Windows (one-click installer); on Linux, the `docker` engine.
 
+> **Windows users — install as administrator.** Right-click the downloaded Docker Desktop installer and choose **Run as administrator** for the first install. Docker Desktop writes into protected system directories during setup, and the standard double-click path will fail with a permission error.
+
 **Where to run the commands below:**
 - **Windows** — open **PowerShell** or **Windows Terminal** (no WSL or bash setup required).
 - **macOS** — open **Terminal**.
 - **Linux** — any shell.
 
+Download the image (~6.6 GB; cached after the first pull):
+
 ```bash
 docker pull ghcr.io/syntheticimmunity/trend-dashboard:latest
-docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
-# → open http://localhost:8000
 ```
+
+Start the dashboard:
+
+```bash
+docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
+```
+
+When the terminal shows `Uvicorn running on http://0.0.0.0:8000`, open [http://localhost:8000](http://localhost:8000) in your web browser.
 
 The image bundles bowtie2, samtools, cutadapt, fastx-toolkit, R + tidyverse + Rsamtools, Python, all dependencies, and the pre-built dashboard frontend. ~5 min from clean machine to running dashboard.
 
