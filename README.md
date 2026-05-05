@@ -4,10 +4,21 @@ End-to-end pipeline + interactive dashboard for the TREND enhancer-screening pla
 
 ## Try the dashboard in 30 seconds
 
+**Prerequisite:** install [Docker Desktop](https://docker.com/products/docker-desktop) (macOS / Windows) or the `docker` engine (Linux), and **launch it** — Docker Desktop must be running before the commands below will work.
+
+**Open a terminal:**
+- **Windows** — **PowerShell** or **Windows Terminal** (no WSL or bash setup needed).
+- **macOS** — **Terminal** (Applications → Utilities → Terminal).
+- **Linux** — any shell.
+
+In the terminal, run:
+
 ```bash
+docker pull ghcr.io/syntheticimmunity/trend-dashboard:latest
 docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
-# → open http://localhost:8000
 ```
+
+The first command downloads the image (~6.6 GB; runs once and is cached). The second command starts the dashboard and prints `Uvicorn running on http://0.0.0.0:8000` when it's ready. **At that point, open [http://localhost:8000](http://localhost:8000) in your web browser.** Leave the terminal window open while you're using the dashboard; closing it stops the container.
 
 The image bundles bowtie2, samtools, cutadapt, fastx-toolkit, R + tidyverse + Rsamtools, Python, all dependencies, the Lib4 alignment reference, and the pre-built dashboard frontend. Runs against the bundled OvCa + T-cell results immediately.
 
