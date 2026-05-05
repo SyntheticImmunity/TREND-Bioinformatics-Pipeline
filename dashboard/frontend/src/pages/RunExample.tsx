@@ -116,10 +116,13 @@ export default function RunExample() {
       await runExampleStream("ovarian_cancer", tier, (event) => {
         if (event.event === "run_started") {
           const active = (event.active_steps as string[]) || [];
-          const skipped = (event.skipped_steps as string[]) || [];
+          // Only seed state for steps this tier actually exercises. Steps
+          // outside the install-check fixture (1, 3, 9 for the pipeline
+          // tier) are intentionally not part of this run; they stay
+          // visible in the Pipeline reference section above. Showing them
+          // as "skipped" in the progress view reads as a failure.
           const initial: Record<string, StepState> = {};
           for (const sid of active) initial[sid] = { status: "pending" };
-          for (const sid of skipped) initial[sid] = { status: "skipped" };
           setStepState(initial);
         } else if (event.event === "step_started") {
           const id = String(event.step_id);
@@ -257,7 +260,10 @@ export default function RunExample() {
       {showStateMachine && stepsData && (
         <section className="mt-12">
           <h2 className="text-card-title font-semibold mb-4">Pipeline progress</h2>
-          <StateMachine steps={stepsData.steps} state={stepState} />
+          <StateMachine
+            steps={stepsData.steps.filter((s) => stepState[s.id] !== undefined)}
+            state={stepState}
+          />
         </section>
       )}
 
