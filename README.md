@@ -6,8 +6,6 @@ End-to-end pipeline + interactive dashboard for the TREND enhancer-screening pla
 
 ## 📋 For reviewers
 
-The GitHub repository is private during the manuscript review period; this anonymized mirror is the read-only equivalent and requires no GitHub account or login. After paper acceptance the GitHub repo will be made public and the mirror will retire.
-
 For an organized walkthrough of what is in the repository — source files, manuscript numbers and where they appear, bundled reproducibility examples, and the Docker-based local run path — read [`REVIEWERS.md`](REVIEWERS.md). It comes in two parts: Part A describes what is in the repository and runs in 5–10 minutes of browsing; Part B walks through a Docker install and two bundled reproducibility checks (the longer finishes in ~3 minutes on a standard laptop). No HPC cluster is required for either part.
 
 ---
@@ -200,4 +198,4 @@ Citation will be added upon manuscript acceptance. For now, please cite the prep
 
 ## Contact
 
-Questions, bug reports, and feature requests: open an issue on the GitHub repository (after publication; private during review).
+Questions, bug reports, and feature requests: open an issue on the GitHub repository.

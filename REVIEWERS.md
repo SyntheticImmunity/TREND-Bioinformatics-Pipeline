@@ -9,17 +9,17 @@ This document is a guide to the repository's contents. It comes in two parts:
 
 No HPC cluster, GPU, or specialized hardware is required for either part. The bundled checks in Part B run on a standard laptop.
 
-> The GitHub URL is private during the review period (it returns a 404 to non-collaborators). The anonymized mirror you received from the journal — 🔗 **https://anonymous.4open.science/r/TREND-Bioinformatics-Pipeline** — provides full read-only access to the same content. The GitHub repo will be made public after paper acceptance.
+> The repository lives at 🔗 **https://github.com/SyntheticImmunity/TREND-Bioinformatics-Pipeline** (MIT-licensed, public read-only). All sections below link directly into the GitHub source tree.
 
 ---
 
 # Part A — Browsing the repository (no install)
 
-The sections below describe what is in the repository and where to find it. Open the anonymized mirror in your browser to follow along.
+The sections below describe what is in the repository and where to find it. Open the GitHub repository in your browser to follow along.
 
 ## A.1 — Source files at a glance
 
-The platform's logic lives in a small number of files. The list below is offered as a map; each file is one click away in the mirror's file tree.
+The platform's logic lives in a small number of files. The list below is offered as a map; each file is one click away in GitHub's file tree.
 
 | File | What it is | Approx. size |
 |---|---|---|
@@ -34,7 +34,7 @@ The platform's logic lives in a small number of files. The list below is offered
 
 ## A.2 — Manuscript numbers and where they appear in the repository
 
-The numbers cited in the manuscript appear in the repository at the locations listed below. The mirror's file viewer renders CSV files as browsable tables.
+The numbers cited in the manuscript appear in the repository at the locations listed below. GitHub renders CSV files as browsable tables in its file viewer.
 
 | Number cited in the manuscript | Location in the repository | Value |
 |---|---|---|
@@ -44,7 +44,7 @@ The numbers cited in the manuscript appear in the repository at the locations li
 | DBD families covered | `dashboard/backend/library/classifications.py` constant `N_LAMBERT_DBD_FAMILIES_TOTAL` | 49 (Lambert taxonomy) |
 | Sensors in the Homeodomain family | `dashboard/backend/library/classifications.py` (Panel C aggregate) | 11,283 |
 | CaCTS cancer-MTF coverage | `references/TREND_library_TF_breakdown.md` | 204/273 = 74.7% |
-| D'Alessio identity-TF coverage | same file | 354/503 = 70.4% (mirror computes 354/505 = 70.9% with alias resolution; difference noted in the breakdown) |
+| D'Alessio identity-TF coverage | same file | 354/503 = 70.4% (the breakdown computes 354/505 = 70.9% with alias resolution; difference noted there) |
 | Top OvCa-selective enhancer | `project_data/final_enhancer_activity_results/ovarian_cancer/ovca_sensor_activity_result_concise.csv`, row 1 | E2F7 promoter (`ATTTTCCCGCCA_E2F7`), ≈26.6× OV8/IOSE selectivity |
 | Share of confirmed TFs in the top six DBD families | `references/TREND_library_TF_breakdown.md` | 67% (489 / 729) |
 
@@ -75,10 +75,10 @@ This part walks through a Docker install and the two bundled reproducibility che
 
 ## B.1 — Get the code
 
-Click **"Download Repository"** at the top of the anonymized mirror to download a ZIP of the source code. Unzip and `cd` into the folder.
+Clone the repository, or click the green **"Code"** button on GitHub and choose **"Download ZIP"**:
 
 ```bash
-unzip TREND-Bioinformatics-Pipeline.zip
+git clone https://github.com/SyntheticImmunity/TREND-Bioinformatics-Pipeline.git
 cd TREND-Bioinformatics-Pipeline
 ```
 

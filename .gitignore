@@ -73,3 +73,13 @@ Thumbs.db
 # Local data downloads (the download script extracts here before placing files)
 # =============================================================================
 data_download/
+
+# =============================================================================
+# Internal / legacy / design-revealing artifacts kept local-only.
+# These are tracked nowhere in the public repo: PRD drafts, design-system
+# specs, in-progress manuscript edit diffs, and the superseded legacy README.
+# =============================================================================
+DASHBOARD_PRD.md
+DESIGN.md
+README.legacy.md
+tools/manuscript_edit_review.html

@@ -39,16 +39,18 @@ class PreflightReport:
     summary: str = ""
 
 
+# Listed in pipeline order (Step 5 → Step 9), with the Python runtime last
+# since it underpins everything rather than mapping to a specific step.
 _BINARIES = [
     {
-        "name": "python",
-        "purpose": "Backend runtime; required.",
-        "version_args": ["--version"],
-        "severity_if_missing": "error",
+        "name": "fastx_collapser",
+        "purpose": "Step 5: collapse PCR duplicates by UMI.",
+        "version_args": ["-h"],
+        "severity_if_missing": "warning",
     },
     {
-        "name": "Rscript",
-        "purpose": "Step 8 (count tables) and Step 9 (enhancer activity). Required for real runs.",
+        "name": "cutadapt",
+        "purpose": "Step 6: extract the 20-bp designed barcode by stripping constant flanks.",
         "version_args": ["--version"],
         "severity_if_missing": "warning",
     },
@@ -65,16 +67,16 @@ _BINARIES = [
         "severity_if_missing": "warning",
     },
     {
-        "name": "cutadapt",
-        "purpose": "Step 6: extract the 20-bp designed barcode by stripping constant flanks.",
+        "name": "Rscript",
+        "purpose": "Step 8 (count tables) and Step 9 (enhancer activity). Required for real runs.",
         "version_args": ["--version"],
         "severity_if_missing": "warning",
     },
     {
-        "name": "fastx_collapser",
-        "purpose": "Step 5: collapse PCR duplicates by UMI.",
-        "version_args": ["-h"],
-        "severity_if_missing": "warning",
+        "name": "python",
+        "purpose": "Backend runtime; required.",
+        "version_args": ["--version"],
+        "severity_if_missing": "error",
     },
 ]
 
@@ -104,19 +106,22 @@ _INSTALL_HINTS = {
 }
 
 
-# (install_name, import_name, purpose) — install_name is what `pip install`
-# expects and what the user sees in the UI; import_name is what the package
-# actually exposes at the Python module level. The two diverge for biopython
-# (installed as `biopython`, imported as `Bio`).
+# Listed pipeline-step-first (Step 1-3 → analysis-wide), then dashboard
+# infrastructure at the bottom. install_name is what `pip install` expects and
+# what the user sees in the UI; import_name is what the package actually
+# exposes at the Python module level. The two diverge for biopython (installed
+# as `biopython`, imported as `Bio`).
 _PYTHON_PACKAGES = [
-    ("biopython", "Bio", "Demultiplexing + FASTQ parsing in Steps 1-3."),
+    ("biopython", "Bio", "Demultiplexing and FASTQ parsing in Steps 1-3."),
     ("pandas", "pandas", "Step 1 sample-barcode CSV processing."),
-    ("numpy", "numpy", "Comparator and aggregations."),
-    ("duckdb", "duckdb", "Library SQLite ingest."),
+    ("numpy", "numpy", "Comparator and aggregations (used throughout)."),
+    ("duckdb", "duckdb", "Library SQLite ingest (one-time)."),
     ("fastapi", "fastapi", "Backend HTTP server."),
 ]
 
 
+# All three R packages are used by Steps 8 / 9; tidyverse spans both, the
+# others are Step 8 specific.
 _R_PACKAGES = [
     ("tidyverse", "Used by both Step 8 and Step 9 R scripts."),
     ("data.table", "Fast CSV ops in Step 8."),
