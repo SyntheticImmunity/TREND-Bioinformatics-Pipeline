@@ -148,15 +148,52 @@ export default function RunExample() {
 
   return (
     <div className="mx-auto max-w-[1200px] px-6 py-16">
-      <h1 className="text-display-section font-semibold tracking-tight">
-        Install check
-      </h1>
+      <h1 className="text-display-section font-semibold tracking-tight">Pipeline</h1>
       <p className="mt-4 max-w-2xl text-muted">
-        Confirm your install reproduces our published outputs before running on
-        your own data. The recommended check runs the full pipeline end-to-end
-        on a small simulated dataset; if it matches the expected outputs, your
-        install is good to go.
+        TREND processes raw sequencing reads through nine ordered steps:
+        demultiplexing, barcode extraction, alignment to the Lib4 reference,
+        and per-promoter enhancer-activity quantification. Below: each step's
+        purpose and tool, then an install check that exercises the stack on
+        bundled data.
       </p>
+
+      {stepsData && (
+        <section className="mt-12">
+          <h2 className="text-card-title font-semibold mb-4">Pipeline reference</h2>
+          <ol className="space-y-3">
+            {stepsData.steps.map((step, idx) => (
+              <li
+                key={step.id}
+                className="flex items-start gap-4 rounded-card border border-cream-border bg-cream p-4"
+              >
+                <span className="font-mono text-xs text-muted tabular-nums pt-1">
+                  {String(idx + 1).padStart(2, "0")}
+                </span>
+                <div className="flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <h4 className="font-semibold text-charcoal">{step.name}</h4>
+                    {step.optional && (
+                      <span className="text-xs text-muted">(optional)</span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm text-charcoal-82">{step.short_purpose}</p>
+                  <p className="mt-2 text-xs text-muted font-mono">{step.tool}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      <section className="mt-16">
+        <h2 className="text-card-title font-semibold">Install check</h2>
+        <p className="mt-3 max-w-2xl text-sm text-charcoal-82">
+          Confirm your install reproduces our published outputs before running
+          on your own data. The recommended check runs the full pipeline
+          end-to-end on a small simulated dataset; if it matches the expected
+          outputs, your install is good to go.
+        </p>
+      </section>
 
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         {TIERS.map((t) => {

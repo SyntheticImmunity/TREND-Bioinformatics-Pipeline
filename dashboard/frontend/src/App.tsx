@@ -1,10 +1,9 @@
-import { Routes, Route, NavLink, Outlet } from "react-router-dom";
+import { Routes, Route, NavLink, Outlet, Navigate } from "react-router-dom";
 import { cn } from "@/lib/cn";
 
 import Home from "@/pages/Home";
 import Library from "@/pages/Library";
 import ConstructDetail from "@/pages/ConstructDetail";
-import Run from "@/pages/Run";
 import RunExample from "@/pages/RunExample";
 import Results from "@/pages/Results";
 import PwmDetail from "@/pages/PwmDetail";
@@ -14,8 +13,7 @@ import Health from "@/pages/Health";
 
 const NAV: { to: string; label: string }[] = [
   { to: "/library", label: "Library" },
-  { to: "/run", label: "Pipeline" },
-  { to: "/run/example", label: "Install check" },
+  { to: "/run/example", label: "Pipeline" },
   { to: "/results", label: "Results" },
   { to: "/project", label: "Projects" },
   { to: "/glossary", label: "Glossary" },
@@ -38,7 +36,6 @@ function Layout() {
               <NavLink
                 key={item.to}
                 to={item.to}
-                end={item.to === "/run"}
                 className={({ isActive }) =>
                   cn(
                     "no-underline px-3 py-1.5 rounded-standard transition-colors",
@@ -69,7 +66,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/library" element={<Library />} />
         <Route path="/library/:id" element={<ConstructDetail />} />
-        <Route path="/run" element={<Run />} />
+        <Route path="/run" element={<Navigate to="/run/example" replace />} />
         <Route path="/run/example" element={<RunExample />} />
         <Route path="/results" element={<Results />} />
         <Route path="/results/pwm/:pwmName" element={<PwmDetail />} />
