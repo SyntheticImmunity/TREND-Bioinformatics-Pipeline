@@ -14,10 +14,6 @@ const TERMS: { term: string; def: string }[] = [
     def: "RNA-to-DNA reads, normalized; the per-construct activity readout.",
   },
   {
-    term: "Sample role",
-    def: "Whether a sample is the DNA (input) or RNA (output) measurement.",
-  },
-  {
     term: "DNA threshold",
     def: "Minimum DNA abundance below which a construct is excluded.",
   },
@@ -32,8 +28,9 @@ export default function Glossary() {
     <div className="mx-auto max-w-[1200px] px-6 py-16">
       <h1 className="text-display-section font-semibold tracking-tight">Glossary</h1>
       <p className="mt-4 max-w-2xl text-muted">
-        Definitions for terms used throughout the interface. The same definitions
-        appear as tooltips on column headers.
+        Quick definitions for the bioinformatics terms that appear in this
+        interface — particularly in the Pipeline tab's step descriptions
+        and the activity-table column headers.
       </p>
 
       <dl className="mt-12 divide-y divide-cream-border">
