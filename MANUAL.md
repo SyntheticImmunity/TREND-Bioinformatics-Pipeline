@@ -35,7 +35,7 @@ You do **not** need an HPC cluster, GPU, or specialized hardware to verify the m
 
 ## 2.5 Data: what's in git, what's downloaded separately
 
-The repository contains all the **code** plus a small set of **bundled fixtures** sufficient for tier-1/2/3 verification. The **full data** (1.2 GB of published alignment count tables, the 152 MB Lib4 reference, the 445 MB per-construct metadata) is hosted on Dropbox and fetched by a one-line script:
+The repository contains all the **code** plus a small set of **bundled fixtures** sufficient for the bundled install check. The **full data** (1.0–1.2 GB of published alignment count tables per project, the 152 MB Lib4 reference, the 18 MB per-enhancer metadata is bundled in the repo) is hosted as assets on this repository's GitHub release `library-data-2026-05-04` and fetched by a one-line script:
 
 ```bash
 # macOS / Linux
@@ -45,14 +45,14 @@ bash scripts/download_data.sh
 pwsh scripts/download_data.ps1
 ```
 
-This downloads ~3 GB and places each file at the path the pipeline expects. The script is idempotent — safe to re-run anytime; it skips files already present. After download you can delete `data_download/` to reclaim disk space.
+This downloads ~3 GB and places each file at the path the pipeline expects. The script is idempotent — safe to re-run anytime; it skips files already present.
 
-**Dropbox URL (also baked into the script):** https://www.dropbox.com/scl/fo/39jvyy6kjho2nyqo59h6e/AHRDQEU4H6NAR85AP99_UDU?rlkey=rcihdns29sfx69930bz5pbjug&dl=0
+**Release URL:** https://github.com/SyntheticImmunity/TREND-Bioinformatics-Pipeline/releases/tag/library-data-2026-05-04
 
-**You don't need to download anything for the manuscript verification** — sections 4.1–4.3 (the three reproducibility tiers) all run against the bundled fixtures in `dashboard/example_data/`. You only need the Dropbox files if you want to:
+**You don't need to download anything for the dashboard's install check or manuscript reproduction.** The install check uses the bundled fixtures in `dashboard/example_data/`; the *Reproduce* tab fetches the per-project count tables from the same GitHub release automatically on first click. You only need to run this script if you want to:
 
 - Browse the full library viewer at all 2.7 million barcoded constructs (the bundled view shows a 1,000-promoter subsample)
-- Re-run Step 9 against the **full** published OvCa alignment data (Tier 2 already does this against a 1,000-promoter subsample, which is sufficient for verification)
+- Re-run Step 9 against the **full** published alignment data outside the dashboard (e.g., on a cluster, or in your own R session)
 - Apply TREND to your own samples (you'll need `Lib4.fasta` for bowtie2 alignment)
 
 After paper acceptance, this dataset will be migrated to a Zenodo deposit with a citable DOI.

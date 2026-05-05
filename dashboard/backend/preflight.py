@@ -148,15 +148,35 @@ def _probe_binary(name: str, version_args: list[str]) -> tuple[bool, str | None]
     binary = shutil.which(name)
     if not binary:
         return False, None
+
+    # fastx_collapser has no --version flag; -h returns the usage line.
+    # Conda installs fastx-toolkit 0.0.14, but the binary itself can't report it,
+    # so we just confirm presence rather than show the usage banner.
+    if name == "fastx_collapser":
+        return True, "present"
+
     try:
         proc = subprocess.run(
             [binary, *version_args],
             capture_output=True, text=True, timeout=5, check=False,
         )
         out = (proc.stdout or proc.stderr).strip()
-        if out:
-            return True, out.splitlines()[0]
-        return True, "present (version unparsed)"
+        if not out:
+            return True, "present"
+        first = out.splitlines()[0].strip()
+
+        # bowtie2 prints the absolute interpreter path before "version X.Y.Z" —
+        # e.g. "/opt/conda/envs/trend/bin/bowtie2-align-s version 2.5.5". Strip
+        # the path; show "bowtie2 2.5.5".
+        if name == "bowtie2" and " version " in first:
+            return True, f"bowtie2 {first.split(' version ', 1)[1].strip()}"
+
+        # cutadapt --version emits the bare version string ("5.2"). Prefix with
+        # the tool name so the value reads naturally on its own.
+        if name == "cutadapt":
+            return True, f"cutadapt {first}"
+
+        return True, first
     except Exception as exc:  # noqa: BLE001 - capture timeout/OS errors uniformly
         return True, f"present (probe failed: {exc})"
 

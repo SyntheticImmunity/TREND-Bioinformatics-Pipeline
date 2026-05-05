@@ -131,7 +131,7 @@ See [`MANUAL.md`](MANUAL.md) § 3 for OS-specific commands to install bowtie2, s
 
 The Docker image (Path A) already bakes in the Lib4 alignment reference, so Path A users can skip this step.
 
-For Path B (Conda) and Path C (Manual) installs, the bowtie2 alignment reference (`Lib4.fasta`) and per-construct metadata (`Lib4_info_concise_060621.csv`) exceed GitHub's per-file size limit and live on Dropbox. One command pulls them and places each file at the path the pipeline expects:
+For Path B (Conda) and Path C (Manual) installs, the bowtie2 alignment reference (`Lib4.fasta`) and per-construct metadata (`Lib4_info_concise_060621.csv`) exceed GitHub's per-file size limit and live as assets on this repository's GitHub release `library-data-2026-05-04`. One command pulls them and places each file at the path the pipeline expects:
 
 ```bash
 # macOS / Linux
@@ -188,7 +188,7 @@ The dashboard wraps — but never modifies — the existing manuscript scripts i
 
 ## Data: what's in git, what's downloaded separately
 
-The repository contains all code plus a small set of bundled fixtures (~36 MB) sufficient for the bundled reproducibility checks. The **full data** (~3 GB: published per-barcode count tables for all screens + the 152 MB Lib4 reference + the 445 MB per-construct metadata) is hosted on Dropbox and fetched by a one-line script:
+The repository contains all code plus a small set of bundled fixtures (~36 MB) sufficient for the bundled reproducibility checks. The **full data** (~3 GB: published per-barcode count tables for all screens + the 152 MB Lib4 reference + the 445 MB per-construct metadata) is hosted as assets on this repository's GitHub release `library-data-2026-05-04` and fetched by a one-line script:
 
 ```bash
 # macOS / Linux
@@ -208,9 +208,9 @@ After paper acceptance, the full dataset will be migrated to a Zenodo deposit wi
 
 The repository supports manuscript reproduction at two levels of stringency:
 
-**Fast verification (~30 seconds, in the dashboard).** Click *Install check → Analysis-only check*. Re-runs the published Step 9 R script against a 1,000-promoter slice of the OvCa count tables and confirms the resulting activity values match the deposited table. Validates that the analysis stack (R + tidyverse + the per-project Step 9 script) is functional in your install.
+**Install check (~3–4 minutes, in the dashboard).** Click *Install check → Run install check*. Phase 1 runs the bioinformatics pipeline (FASTQ → adapter trim → UMI collapse → barcode extract → bowtie2 → count matrix) on a small simulated FASTQ fixture and verifies the count matrix matches analytically-computed expected values. Phase 2 runs the per-project Step 9 R script on a 1,000-promoter slice of real OvCa alignment data and verifies the activity table matches the published values row-for-row. A green "all match" report confirms every tool in the stack — bowtie2, cutadapt, samtools, fastx-toolkit, R + tidyverse, and the per-project Step 9 script — is functional in your install.
 
-**Full-data reproduction (~5–7 minutes, in the dashboard).** Click *Reproduce this analysis* on either project card on the Projects page. The dashboard fetches the full post-alignment count tables from this repository's GitHub release, runs the manuscript's unmodified Step 9 R script against them, and exposes both the produced CSV and the deposited reference CSV for download. Compare them with your tool of choice — the dashboard does not assert a match.
+**Reproduce key results (~5–7 minutes per project, in the dashboard).** Click *Reproduce* in the navigation, then *Reproduce this analysis* on either project card. The dashboard fetches the full post-alignment count tables from this repository's GitHub release on first click (~1.0–1.2 GB per project; cached afterwards), runs the manuscript's unmodified Step 9 R script against them, and exposes both the produced CSV and the deposited reference CSV for download. The two files should be byte-identical when produced by the bundled Docker image.
 
 The same reproduction is available on the command line — see [`REVIEWERS.md`](REVIEWERS.md) § *Reproducing the manuscript's results* for the four-step procedure (download → place → `Rscript` → diff). Verified bit-for-bit (zero numeric mismatches across 3.8 million cells, both projects) when run inside the bundled Docker image.
 

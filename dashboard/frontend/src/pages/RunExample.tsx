@@ -129,17 +129,20 @@ export default function RunExample() {
         </p>
         <ul className="mt-4 space-y-2 text-sm text-charcoal-82 list-disc pl-5">
           <li>
-            <strong>Phase 1 — Steps 2–8 (alignment + count tables).</strong>{" "}
-            Snakemake on a small simulated FASTQ fixture; produces the
-            post-alignment count matrix and verifies it matches the
-            analytically-computed expected values. Validates bowtie2,
-            cutadapt, samtools, fastx-toolkit, and the count-table R script.
+            <strong>Phase 1 — Alignment + count tables.</strong>{" "}
+            Snakemake runs the bioinformatics pipeline (FASTQ → adapter
+            trim → UMI collapse → barcode extract → bowtie2 → count
+            matrix) on a small simulated FASTQ fixture, then verifies
+            the resulting count matrix matches analytically-computed
+            expected values. Validates bowtie2, cutadapt, samtools,
+            fastx-toolkit, and the count-table R script.
           </li>
           <li>
-            <strong>Phase 2 — Step 9 (enhancer-activity quantification).</strong>{" "}
-            R + tidyverse on a 1,000-promoter slice of real OvCa alignment
-            data; verifies the activity table matches the published values
-            row-for-row. Validates the per-project Step 9 R script.
+            <strong>Phase 2 — Enhancer-activity quantification.</strong>{" "}
+            R + tidyverse runs the per-project Step 9 script on a
+            1,000-promoter slice of real OvCa alignment data and
+            verifies the activity table matches the published values
+            row-for-row.
           </li>
         </ul>
         <p className="mt-3 text-xs text-muted">

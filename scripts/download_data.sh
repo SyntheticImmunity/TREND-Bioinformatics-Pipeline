@@ -1,37 +1,40 @@
 #!/usr/bin/env bash
-# Download the large data files from Dropbox and place them where the dashboard
-# and pipeline expect them. Safe to re-run — skips files that are already in
-# place and verified.
+# Fetch large data files from this repository's GitHub release and place them
+# where the pipeline and R scripts expect them. Safe to re-run — skips files
+# that are already present.
 #
 # Usage:
-#   bash scripts/download_data.sh           # download + auto-place
+#   bash scripts/download_data.sh           # download what's missing
 #   bash scripts/download_data.sh --check   # report what's present, don't download
 #
 # Total download is ~3 GB. Allow 10-20 minutes on a fast connection.
 
 set -euo pipefail
 
-DROPBOX_URL="https://www.dropbox.com/scl/fo/39jvyy6kjho2nyqo59h6e/AHRDQEU4H6NAR85AP99_UDU?rlkey=rcihdns29sfx69930bz5pbjug&dl=1"
-DOWNLOAD_DIR="data_download"
+RELEASE_TAG="library-data-2026-05-04"
+RELEASE_BASE="https://github.com/SyntheticImmunity/TREND-Bioinformatics-Pipeline/releases/download/${RELEASE_TAG}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-# Files this script must end up placing into the repo.
-declare -A EXPECTED_FILES=(
+# target path (in the repo) → release asset name on the GitHub release.
+# Project-prefixed assets ('ovarian_cancer__...', 'T_cell_activation__...') live
+# on the release under those names because release assets share a flat namespace;
+# the prefix is dropped on placement so the R script finds the file at its
+# canonical path.
+declare -A FILES=(
   ["codes/2. HPC_cluster_scripts/required_metadata/Lib4.fasta"]="Lib4.fasta"
   ["codes/2. HPC_cluster_scripts/required_metadata/Lib4_info_concise_060621.csv"]="Lib4_info_concise_060621.csv"
-  ["project_data/alignment_results/ovarian_cancer/alignment_result_normalized_in_house_pipeline.csv"]="alignment_result_normalized_in_house_pipeline.csv"
-  ["project_data/alignment_results/ovarian_cancer/alignment_result_unnormalized_in_house_pipeline.csv"]="alignment_result_unnormalized_in_house_pipeline.csv"
-  ["project_data/alignment_results/T_cell_activation/alignment_result_normalized_in_house_pipeline.csv"]="alignment_result_normalized_in_house_pipeline.csv"
-  ["project_data/alignment_results/T_cell_activation/alignment_result_unnormalized_in_house_pipeline.csv"]="alignment_result_unnormalized_in_house_pipeline.csv"
+  ["project_data/alignment_results/ovarian_cancer/alignment_result_normalized_in_house_pipeline.csv"]="ovarian_cancer__alignment_result_normalized_in_house_pipeline.csv"
+  ["project_data/alignment_results/ovarian_cancer/alignment_result_unnormalized_in_house_pipeline.csv"]="ovarian_cancer__alignment_result_unnormalized_in_house_pipeline.csv"
+  ["project_data/alignment_results/T_cell_activation/alignment_result_normalized_in_house_pipeline.csv"]="T_cell_activation__alignment_result_normalized_in_house_pipeline.csv"
+  ["project_data/alignment_results/T_cell_activation/alignment_result_unnormalized_in_house_pipeline.csv"]="T_cell_activation__alignment_result_unnormalized_in_house_pipeline.csv"
 )
 
-# --- Step 1: report what's already present ------------------------------------
 report_status() {
   local missing=0
   echo "=== Data file status ==="
-  for target in "${!EXPECTED_FILES[@]}"; do
+  for target in "${!FILES[@]}"; do
     if [[ -f "$target" ]]; then
       size=$(du -h "$target" | cut -f1)
       printf "  [OK]      %-100s  %s\n" "$target" "$size"
@@ -48,7 +51,8 @@ if [[ "${1:-}" == "--check" ]]; then
     echo "All data files present. Nothing to download."
     exit 0
   else
-    echo "$? files missing. Re-run without --check to download."
+    miss=$?
+    echo "$miss file(s) missing. Re-run without --check to download."
     exit 1
   fi
 fi
@@ -58,74 +62,35 @@ if report_status; then
   exit 0
 fi
 
-# --- Step 2: download the Dropbox folder as a zip -----------------------------
-mkdir -p "$DOWNLOAD_DIR"
-ZIP_PATH="$DOWNLOAD_DIR/trend_data.zip"
-
-if [[ ! -f "$ZIP_PATH" ]]; then
-  echo
-  echo "=== Downloading from Dropbox (~3 GB) ==="
-  echo "  This will take 10-20 minutes on a fast connection."
-  echo "  Source: $DROPBOX_URL"
-  echo
-  if command -v curl >/dev/null 2>&1; then
-    curl -L --progress-bar -o "$ZIP_PATH" "$DROPBOX_URL"
-  elif command -v wget >/dev/null 2>&1; then
-    wget --show-progress -O "$ZIP_PATH" "$DROPBOX_URL"
-  else
-    echo "ERROR: neither curl nor wget is installed."
-    echo "Manual fallback: open this URL in your browser, save the zip to $ZIP_PATH, and re-run:"
-    echo "  $DROPBOX_URL"
-    exit 1
-  fi
-else
-  echo "Using cached download at $ZIP_PATH"
-fi
-
-# --- Step 3: extract --------------------------------------------------------
-echo
-echo "=== Extracting ==="
-EXTRACT_DIR="$DOWNLOAD_DIR/extracted"
-mkdir -p "$EXTRACT_DIR"
-if command -v unzip >/dev/null 2>&1; then
-  unzip -q -o "$ZIP_PATH" -d "$EXTRACT_DIR"
-else
-  echo "ERROR: unzip is not installed."
-  echo "On Linux/macOS: install with your package manager (apt install unzip / brew install unzip)."
-  echo "On Windows: use 7-Zip or right-click → Extract All on $ZIP_PATH, then re-run with --check."
+if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+  echo "ERROR: neither curl nor wget is installed."
+  echo "Install one of them, or download the assets manually from:"
+  echo "  https://github.com/SyntheticImmunity/TREND-Bioinformatics-Pipeline/releases/tag/${RELEASE_TAG}"
   exit 1
 fi
 
-# --- Step 4: place files into the repo ----------------------------------------
 echo
-echo "=== Placing files into the repo ==="
+echo "=== Fetching from GitHub release ${RELEASE_TAG} ==="
 placed=0
-for target in "${!EXPECTED_FILES[@]}"; do
-  filename="${EXPECTED_FILES[$target]}"
-  # Look for the file anywhere under the extract directory.
-  src=$(find "$EXTRACT_DIR" -type f -name "$filename" 2>/dev/null | head -1)
-  if [[ -z "$src" ]]; then
-    # Fallback: the T-cell normalized count table was originally uploaded to
-    # Dropbox with a doubled-dot typo (..csv). The repo target uses the
-    # canonical single-dot name; if the archive still has the typo'd copy,
-    # find it under the typo'd name and place it under the canonical name.
-    alt_filename="${filename/.csv/..csv}"
-    src=$(find "$EXTRACT_DIR" -type f -name "$alt_filename" 2>/dev/null | head -1)
-  fi
-  if [[ -z "$src" ]]; then
-    echo "  [WARN]  $filename not found in the downloaded archive"
+for target in "${!FILES[@]}"; do
+  if [[ -f "$target" ]]; then
     continue
   fi
+  asset="${FILES[$target]}"
+  url="${RELEASE_BASE}/${asset}"
   target_dir=$(dirname "$target")
   mkdir -p "$target_dir"
-  cp "$src" "$target"
+  echo
+  echo "  → $asset"
+  echo "    $target"
+  if command -v curl >/dev/null 2>&1; then
+    curl -L --fail --progress-bar -o "$target" "$url"
+  else
+    wget --show-progress -O "$target" "$url"
+  fi
   placed=$((placed + 1))
-  echo "  [OK]    $target"
 done
 
 echo
 echo "=== Done — placed $placed files ==="
 report_status || true
-echo
-echo "Tip: you can delete the cache to reclaim disk space:"
-echo "  rm -rf $DOWNLOAD_DIR"

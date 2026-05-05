@@ -68,7 +68,7 @@ _REPRODUCE_PROJECTS: dict[str, dict] = {
             "ovca_sensor_activity_result_concise.csv",
             "ovca_sensor_activity_result_all.csv",
         ],
-        "approx_download_mb": 1300,
+        "approx_download_mb": 1200,
     },
     "T_cell_activation": {
         "r_script": (
@@ -86,7 +86,7 @@ _REPRODUCE_PROJECTS: dict[str, dict] = {
             "activation_responsive_enhancer_screening_result_donor1.csv",
             "activation_responsive_enhancer_screening_result_donor2.csv",
         ],
-        "approx_download_mb": 1080,
+        "approx_download_mb": 1030,
     },
 }
 
