@@ -2,11 +2,42 @@
 
 End-to-end pipeline + interactive dashboard for the TREND enhancer-screening platform. The Lib4 designed library contains ~2.7 million barcoded enhancer-reporter constructs across 1,068 transcription factors; this software takes raw sequencing reads through demultiplexing, barcode extraction, alignment to the Lib4 reference, and per-promoter activity quantification, with a web dashboard for interactive exploration.
 
+## Try the dashboard in 30 seconds
+
+```bash
+docker run -p 8000:8000 ghcr.io/syntheticimmunity/trend-dashboard:latest
+# → open http://localhost:8000
+```
+
+The image bundles bowtie2, samtools, cutadapt, fastx-toolkit, R + tidyverse + Rsamtools, Python, all dependencies, the Lib4 alignment reference, and the pre-built dashboard frontend. Runs against the bundled OvCa + T-cell results immediately.
+
+## Where to start
+
+| If you're a... | Start at | Time budget |
+|---|---|---|
+| **Reviewer** verifying the manuscript | [`REVIEWERS.md`](REVIEWERS.md) — repo tour, manuscript-number cross-reference, one-click reproducibility checks | 5–10 min browsing; ~30 sec for the bundled analysis check |
+| **Adopter** running TREND on your own FASTQs | [Quickstart for adopters](#-for-new-users-running-trend-on-your-own-data) below + [`MANUAL.md`](MANUAL.md) | ~5 min install; alignment hours; per-iteration minutes |
+| **Developer** extending or self-hosting the dashboard | [`dashboard/README.md`](dashboard/README.md) | Varies |
+
+## Repository tour
+
+| Path | What it is |
+|---|---|
+| **[`REVIEWERS.md`](REVIEWERS.md)** | Reviewer-first walkthrough — repo map, manuscript-number cross-references, reproducibility procedures |
+| **[`MANUAL.md`](MANUAL.md)** | Comprehensive adopter manual — install paths, dashboard tour, troubleshooting, glossary |
+| `pipeline/` | Snakemake workflow + the `trend` CLI (`init` / `run` / `dashboard` / `preflight`) |
+| `dashboard/` | FastAPI backend + React/Tailwind frontend |
+| `project_data/` | Bundled published outputs — OvCa & T-cell activity tables |
+| `codes/` | Manuscript's original scripts (UNCHANGED) |
+| `references/` | Library metadata, TF taxonomy tables (Lambert / D'Alessio), curated breakdowns |
+| `scripts/` | Data-download helpers (`download_data.{sh,ps1}`) |
+| `tests/` · `tools/` | Automated equivalence tests, fixture builders, audit utilities |
+
 ---
 
 ## 📋 For reviewers
 
-For an organized walkthrough of what is in the repository — source files, manuscript numbers and where they appear, bundled reproducibility examples, and the Docker-based local run path — read [`REVIEWERS.md`](REVIEWERS.md). It comes in two parts: Part A describes what is in the repository and runs in 5–10 minutes of browsing; Part B walks through a Docker install and two bundled reproducibility checks (the longer finishes in ~3 minutes on a standard laptop). No HPC cluster is required for either part.
+For an organized walkthrough of what is in the repository — source files, manuscript numbers and where they appear, bundled reproducibility examples, and the Docker-based local run path — read [`REVIEWERS.md`](REVIEWERS.md). It comes in two parts: Part A describes what is in the repository and runs in 5–10 minutes of browsing; Part B walks through a Docker install and the bundled reproducibility checks. No HPC cluster is required for either part.
 
 ---
 
@@ -123,29 +154,6 @@ The full user manual is in [`MANUAL.md`](MANUAL.md). For HPC-specific configurat
 
 ---
 
-## What's in the box
-
-```
-TREND-Bioinformatics-Pipeline/
-├── pipeline/                trend CLI + Snakemake workflow + Bioconda recipe
-│   ├── trend/cli.py         The user-facing `trend` command
-│   ├── trend/workflow/      Snakemake DAG with per-rule conda envs
-│   ├── templates/           Project scaffolds for `trend init`
-│   └── conda-recipe/        Bioconda submission (planned)
-├── dashboard/               FastAPI backend + React/Tailwind frontend
-│   ├── backend/             Library service, pipeline runner, oracle, preflight
-│   ├── frontend/            Interactive UI (Recharts, TanStack Table, shadcn/ui)
-│   └── example_data/        Bundled tiny datasets for reviewer verification
-├── codes/                   Original manuscript scripts (UNCHANGED)
-│   ├── 2. HPC_cluster_scripts/
-│   └── 3. Post_HPC_enhancer_activity_analysis_scripts/
-├── project_data/            Published analysis outputs (small CSVs only)
-├── tests/                   18 tests — pytest tests/ -v
-├── tools/                   build_fixtures.py — deterministic fixture generator
-├── scripts/                 download_data.{sh,ps1} for the Dropbox-hosted full data
-└── references/              Lambert/Reddy/D'Alessio derived tables + breakdown md
-```
-
 The dashboard wraps — but never modifies — the existing manuscript scripts in `codes/`. The Snakemake workflow shells out to those same scripts, so any verification you do via this software exercises the original published code.
 
 ---
@@ -168,16 +176,15 @@ After paper acceptance, the full dataset will be migrated to a Zenodo deposit wi
 
 ---
 
-## Verifying the manuscript's claims
+## Reproducing the manuscript's results
 
-The dashboard's Verify tab exposes two reproducibility checks against bundled example datasets, both also runnable from the CLI:
+The repository supports manuscript reproduction at two levels of stringency:
 
-```bash
-trend run --example ovarian_cancer --tier step9      # ~30 s   needs R; reproduces the published activity numbers from a 1,000-promoter slice of real OvCa alignment data
-trend run --example ovarian_cancer --tier pipeline   # ~3 min  needs the full conda env; runs the full FASTQ-to-counts pipeline on simulated reads
-```
+**Fast verification (~30 seconds, in the dashboard).** Click *Install check → Analysis-only check*. Re-runs the published Step 9 R script against a 1,000-promoter slice of the OvCa count tables and confirms the resulting activity values match the deposited table. Validates that the analysis stack (R + tidyverse + the per-project Step 9 script) is functional in your install.
 
-Each prints a self-contained report ending in `overall_pass: True` plus per-file column-by-column match results. The dashboard exposes the same checks as click-to-run cards on the Verify tab, with a green "match" badge and per-file diff if anything differs.
+**Full-data reproduction (~5–7 minutes, in the dashboard).** Click *Reproduce this analysis* on either project card on the Projects page. The dashboard fetches the full post-alignment count tables from this repository's GitHub release, runs the manuscript's unmodified Step 9 R script against them, and exposes both the produced CSV and the deposited reference CSV for download. Compare them with your tool of choice — the dashboard does not assert a match.
+
+The same reproduction is available on the command line — see [`REVIEWERS.md`](REVIEWERS.md) § *Reproducing the manuscript's results* for the four-step procedure (download → place → `Rscript` → diff). Verified bit-for-bit (zero numeric mismatches across 3.8 million cells, both projects) when run inside the bundled Docker image.
 
 ---
 

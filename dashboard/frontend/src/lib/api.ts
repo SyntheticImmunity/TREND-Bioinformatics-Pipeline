@@ -430,6 +430,33 @@ export async function runExampleStream(
   }, onEvent);
 }
 
+/**
+ * SSE consumer for /run/reproduce/{project}/stream. On first call for a
+ * project, the backend downloads the count tables (~1+ GB) from a GitHub
+ * release into the canonical alignment_results path; subsequent calls in
+ * the same container reuse the cached files. Then runs the manuscript's
+ * Step 9 R script and exposes produced + deposited output paths via
+ * companion GET endpoints (see reproduceDownloadUrl below).
+ */
+export async function runReproduceStream(
+  project: string,
+  onEvent: (event: { event: string } & Record<string, unknown>) => void,
+): Promise<void> {
+  await consumeSSE(`/run/reproduce/${encodeURIComponent(project)}/stream`, {
+    method: "POST",
+    headers: { Accept: "text/event-stream" },
+  }, onEvent);
+}
+
+/** Build the URL to download a produced or deposited reproduce output. */
+export function reproduceDownloadUrl(
+  project: string,
+  which: "produced" | "deposited",
+  filename: string,
+): string {
+  return `/run/reproduce/${encodeURIComponent(project)}/${which}/${encodeURIComponent(filename)}`;
+}
+
 async function consumeSSE(
   url: string,
   init: RequestInit,

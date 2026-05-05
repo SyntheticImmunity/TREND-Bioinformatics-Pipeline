@@ -39,6 +39,67 @@ PIPELINE_TIER_STEPS = ["step_2_flip_orientation", "step_4_trim_adapters",
 PIPELINE_TIER_SKIPPED = ["step_1_verify_barcodes", "step_3_demultiplex",
                          "step_9_enhancer_activity"]
 
+# Reproduce-the-manuscript flow: count tables are NOT bundled in the image
+# (they're 1+ GB per project). On first reproduce-button click, the dashboard
+# fetches them from this GitHub release and caches in the canonical
+# project_data/alignment_results/{project}/ path for the container's lifetime.
+REPRODUCE_RELEASE_TAG = "library-data-2026-05-04"
+REPRODUCE_RELEASE_URL = (
+    f"https://github.com/SyntheticImmunity/TREND-Bioinformatics-Pipeline"
+    f"/releases/download/{REPRODUCE_RELEASE_TAG}"
+)
+
+# Per-project: the R script, the metadata file it reads, and the expected
+# output filenames Step 9 produces.
+_REPRODUCE_PROJECTS: dict[str, dict] = {
+    "ovarian_cancer": {
+        "r_script": (
+            config.CODES_ROOT
+            / "3. Post_HPC_enhancer_activity_analysis_scripts"
+            / "code_by_projects" / "ovarian_cancer"
+            / "ovarian_cancer_specific_enhancer_screening_analysis.R"
+        ),
+        "metadata_csv": (
+            config.CODES_ROOT
+            / "3. Post_HPC_enhancer_activity_analysis_scripts"
+            / "required_metadata" / "all_enhancer_metadata_111525.csv"
+        ),
+        "outputs": [
+            "ovca_sensor_activity_result_concise.csv",
+            "ovca_sensor_activity_result_all.csv",
+        ],
+        "approx_download_mb": 1300,
+    },
+    "T_cell_activation": {
+        "r_script": (
+            config.CODES_ROOT
+            / "3. Post_HPC_enhancer_activity_analysis_scripts"
+            / "code_by_projects" / "T_cell_activation"
+            / "T_cell_activation_responsive_enhancer_screening_analysis.R"
+        ),
+        "metadata_csv": (
+            config.CODES_ROOT
+            / "3. Post_HPC_enhancer_activity_analysis_scripts"
+            / "required_metadata" / "all_enhancer_metadata_111525.csv"
+        ),
+        "outputs": [
+            "activation_responsive_enhancer_screening_result_donor1.csv",
+            "activation_responsive_enhancer_screening_result_donor2.csv",
+        ],
+        "approx_download_mb": 1080,
+    },
+}
+
+_REPRODUCE_COUNT_TABLES = [
+    "alignment_result_normalized_in_house_pipeline.csv",
+    "alignment_result_unnormalized_in_house_pipeline.csv",
+]
+
+# Module-level map of {project: produced_dir} so the file-serving endpoints
+# can locate the most recent run's outputs. Sufficient for a single-user
+# dashboard session (the only intended use).
+_LATEST_REPRODUCE_DIRS: dict[str, Path] = {}
+
 
 @dataclass
 class OracleReport:
@@ -653,3 +714,143 @@ def _missing_fixtures(tier: str, hint: str) -> OracleReport:
         overall_pass=False, runtime_seconds=0.0, file_results=[],
         notes=[f"Bundled fixtures for tier '{tier}' not found. {hint}"],
     )
+
+
+# ---------------------------------------------------------------------------
+# Reproduce-the-manuscript streaming flow
+# ---------------------------------------------------------------------------
+def reproduce_streaming(project: str) -> Iterator[dict]:
+    """Run the manuscript's Step 9 R script against the deposited count tables.
+
+    On first call for a project, downloads the count tables from the GitHub
+    release into project_data/alignment_results/{project}/. Subsequent calls
+    in the same container reuse the downloaded files. Yields events:
+
+      - run_started   : { download_mb, count_tables_present }
+      - download_started / download_progress / download_finished
+      - analysis_started / analysis_finished
+      - report        : { produced_files, deposited_files, runtime_seconds }
+    """
+    import urllib.request
+    import urllib.error
+
+    if project not in _REPRODUCE_PROJECTS:
+        yield {"event": "report", "payload": {
+            "error": f"Unknown project: {project}",
+            "produced_files": [], "deposited_files": [],
+        }}
+        return
+
+    cfg = _REPRODUCE_PROJECTS[project]
+    target_dir = config.PROJECT_DATA_ROOT / "alignment_results" / project
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    missing = [f for f in _REPRODUCE_COUNT_TABLES if not (target_dir / f).exists()]
+    yield {
+        "event": "run_started",
+        "project": project,
+        "download_needed": bool(missing),
+        "approx_download_mb": cfg["approx_download_mb"] if missing else 0,
+        "count_tables_present": [f for f in _REPRODUCE_COUNT_TABLES
+                                 if (target_dir / f).exists()],
+        "count_tables_to_download": missing,
+    }
+
+    # ---- Download phase ----
+    if missing:
+        yield {"event": "download_started", "files": missing}
+        for filename in missing:
+            asset_name = f"{project}__{filename}"
+            url = f"{REPRODUCE_RELEASE_URL}/{asset_name}"
+            target_path = target_dir / filename
+            yield {"event": "download_progress", "filename": filename,
+                   "stage": "fetching", "url": url}
+            try:
+                # Stream download with progress reporting.
+                req = urllib.request.Request(url, headers={"Accept": "application/octet-stream"})
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    total = int(resp.headers.get("Content-Length", 0))
+                    chunk_size = 8 * 1024 * 1024  # 8 MiB
+                    written = 0
+                    last_yield_mb = 0
+                    with open(target_path, "wb") as out:
+                        while True:
+                            chunk = resp.read(chunk_size)
+                            if not chunk:
+                                break
+                            out.write(chunk)
+                            written += len(chunk)
+                            current_mb = written / (1024 * 1024)
+                            if current_mb - last_yield_mb >= 50:
+                                yield {
+                                    "event": "download_progress",
+                                    "filename": filename,
+                                    "stage": "downloading",
+                                    "downloaded_bytes": written,
+                                    "total_bytes": total,
+                                }
+                                last_yield_mb = current_mb
+            except (urllib.error.URLError, OSError) as exc:
+                # Clean up partial file
+                target_path.unlink(missing_ok=True)
+                yield {"event": "report", "payload": {
+                    "error": f"Download failed for {filename}: {exc}",
+                    "produced_files": [], "deposited_files": [],
+                }}
+                return
+        yield {"event": "download_finished"}
+
+    # ---- Analysis phase ----
+    yield {"event": "analysis_started", "estimated_minutes": 5}
+    rscript = shutil.which("Rscript")
+    if not rscript:
+        yield {"event": "report", "payload": {
+            "error": "Rscript is not available in this environment. "
+                     "Use the Docker container — it bundles R + tidyverse.",
+            "produced_files": [], "deposited_files": [],
+        }}
+        return
+
+    t0 = time.perf_counter()
+    paths = {
+        "inputs_dir": target_dir,
+        "metadata_csv": cfg["metadata_csv"],
+        "step9_script": cfg["r_script"],
+        "outputs": cfg["outputs"],
+    }
+    try:
+        actual_dir = _execute_step9(paths)
+    except Exception as exc:
+        log.exception("reproduce: Step 9 invocation failed")
+        yield {"event": "report", "payload": {
+            "error": f"Analysis failed: {exc}",
+            "produced_files": [], "deposited_files": [],
+        }}
+        return
+
+    runtime = round(time.perf_counter() - t0, 2)
+    yield {"event": "analysis_finished", "runtime_seconds": runtime}
+
+    # Verify outputs landed and remember where for the file-serving endpoints.
+    produced_files: list[str] = []
+    for name in cfg["outputs"]:
+        if (actual_dir / name).exists():
+            produced_files.append(name)
+
+    deposited_dir = config.PROJECT_DATA_ROOT / "final_enhancer_activity_results" / project
+    deposited_files = [n for n in cfg["outputs"] if (deposited_dir / n).exists()]
+
+    _LATEST_REPRODUCE_DIRS[project] = actual_dir
+
+    yield {"event": "report", "payload": {
+        "project": project,
+        "runtime_seconds": runtime,
+        "produced_files": produced_files,
+        "deposited_files": deposited_files,
+        "error": None,
+    }}
+
+
+def get_latest_reproduce_dir(project: str) -> Path | None:
+    """Return the most recent produced-output directory for a project, or None."""
+    return _LATEST_REPRODUCE_DIRS.get(project)

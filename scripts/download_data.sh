@@ -23,7 +23,7 @@ declare -A EXPECTED_FILES=(
   ["codes/2. HPC_cluster_scripts/required_metadata/Lib4_info_concise_060621.csv"]="Lib4_info_concise_060621.csv"
   ["project_data/alignment_results/ovarian_cancer/alignment_result_normalized_in_house_pipeline.csv"]="alignment_result_normalized_in_house_pipeline.csv"
   ["project_data/alignment_results/ovarian_cancer/alignment_result_unnormalized_in_house_pipeline.csv"]="alignment_result_unnormalized_in_house_pipeline.csv"
-  ["project_data/alignment_results/T_cell_activation/alignment_result_normalized_in_house_pipeline..csv"]="alignment_result_normalized_in_house_pipeline..csv"
+  ["project_data/alignment_results/T_cell_activation/alignment_result_normalized_in_house_pipeline.csv"]="alignment_result_normalized_in_house_pipeline.csv"
   ["project_data/alignment_results/T_cell_activation/alignment_result_unnormalized_in_house_pipeline.csv"]="alignment_result_unnormalized_in_house_pipeline.csv"
 )
 
@@ -104,6 +104,14 @@ for target in "${!EXPECTED_FILES[@]}"; do
   filename="${EXPECTED_FILES[$target]}"
   # Look for the file anywhere under the extract directory.
   src=$(find "$EXTRACT_DIR" -type f -name "$filename" 2>/dev/null | head -1)
+  if [[ -z "$src" ]]; then
+    # Fallback: the T-cell normalized count table was originally uploaded to
+    # Dropbox with a doubled-dot typo (..csv). The repo target uses the
+    # canonical single-dot name; if the archive still has the typo'd copy,
+    # find it under the typo'd name and place it under the canonical name.
+    alt_filename="${filename/.csv/..csv}"
+    src=$(find "$EXTRACT_DIR" -type f -name "$alt_filename" 2>/dev/null | head -1)
+  fi
   if [[ -z "$src" ]]; then
     echo "  [WARN]  $filename not found in the downloaded archive"
     continue

@@ -23,6 +23,7 @@ import json as _json
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Path as FastAPIPath
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -33,7 +34,12 @@ from backend import __version__, config, preflight
 from backend.library import queries
 from backend.library.pwms import load_pwms
 from backend.library.summary import SummaryNotBuilt, load_summary
-from backend.oracle.run_example import run_oracle, run_oracle_streaming
+from backend.oracle.run_example import (
+    run_oracle,
+    run_oracle_streaming,
+    reproduce_streaming,
+    get_latest_reproduce_dir,
+)
 from backend.pipeline import error_hints, runner
 from backend.schemas import _loader as schema_loader
 
@@ -482,6 +488,78 @@ def run_example_stream(
             yield {"event": event.get("event", "message"), "data": _json.dumps(event)}
 
     return EventSourceResponse(event_source())
+
+
+# ---------------------------------------------------------------------------
+# Reproduce-the-manuscript endpoints
+# ---------------------------------------------------------------------------
+_REPRODUCE_PROJECT_PATTERN = "^(ovarian_cancer|T_cell_activation)$"
+
+
+@app.post("/run/reproduce/{project}/stream")
+def run_reproduce_stream(
+    project: str = FastAPIPath(pattern=_REPRODUCE_PROJECT_PATTERN),
+):
+    """Streaming reproduce-the-manuscript flow.
+
+    On first call, downloads count tables (~1+ GB) from the bundled GitHub
+    release into project_data/alignment_results/{project}/. Then runs the
+    manuscript's published Step 9 R script against those tables. Yields
+    download_progress, analysis_started/finished, and a final 'report' event.
+    """
+    iterator = reproduce_streaming(project=project)
+
+    async def event_source():
+        loop = asyncio.get_running_loop()
+        sentinel = object()
+
+        def _next():
+            try:
+                return next(iterator)
+            except StopIteration:
+                return sentinel
+
+        while True:
+            event = await loop.run_in_executor(None, _next)
+            if event is sentinel:
+                break
+            yield {"event": event.get("event", "message"), "data": _json.dumps(event)}
+
+    return EventSourceResponse(event_source())
+
+
+@app.get("/run/reproduce/{project}/produced/{filename}")
+def get_reproduce_produced(
+    project: str = FastAPIPath(pattern=_REPRODUCE_PROJECT_PATTERN),
+    filename: str = FastAPIPath(pattern=r"^[A-Za-z0-9_.\-]+\.csv$"),
+):
+    """Serve a CSV produced by the most recent reproduce run."""
+    actual_dir = get_latest_reproduce_dir(project)
+    if actual_dir is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No produced output for {project}. Run reproduce first.",
+        )
+    target = actual_dir / filename
+    if not target.exists():
+        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+    return FileResponse(
+        path=target, media_type="text/csv", filename=filename,
+    )
+
+
+@app.get("/run/reproduce/{project}/deposited/{filename}")
+def get_reproduce_deposited(
+    project: str = FastAPIPath(pattern=_REPRODUCE_PROJECT_PATTERN),
+    filename: str = FastAPIPath(pattern=r"^[A-Za-z0-9_.\-]+\.csv$"),
+):
+    """Serve a deposited reference CSV from project_data/."""
+    target = config.PROJECT_DATA_ROOT / "final_enhancer_activity_results" / project / filename
+    if not target.exists():
+        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+    return FileResponse(
+        path=target, media_type="text/csv", filename=filename,
+    )
 
 
 _PWM_VERSION_SUFFIX = __import__("re").compile(r"_v\d+$")

@@ -134,6 +134,61 @@ Each prints a self-contained report ending in `overall_pass: True`.
 
 ---
 
+## Reproducing the manuscript's results
+
+The repository supports manuscript reproduction at two levels of stringency. Both validate against the deposited activity tables in `project_data/final_enhancer_activity_results/`.
+
+### Fast verification (~30 seconds)
+
+Click *Install check → Analysis-only check* in the dashboard. The dashboard re-runs the published Step 9 R script against a 1,000-promoter slice of the OvCa count tables (bundled under `dashboard/example_data/ovca_step9/`) and compares the resulting activity values to the deposited table row-for-row. A green "all match" badge confirms the analysis stack — R + tidyverse + the per-project Step 9 script — is functional in your install.
+
+This is sufficient to confirm the dashboard's machinery works end-to-end. It is *not* a full-data check — only 1,000 of the ~57,000 promoters are exercised.
+
+### Full-data reproduction (~5–7 minutes)
+
+For row-for-row verification of the full deposited activity tables, run the manuscript's unmodified Step 9 R script against the full deposited count tables. Two equivalent paths.
+
+#### Path 1 — One-click in the dashboard
+
+On the Projects page, each project card has a *Reproduce this analysis* button. Click → confirm the download → the dashboard fetches the count tables from this repository's GitHub release on first use, runs the R script, and exposes both the just-produced CSV and the deposited reference CSV for download. Compare them with your tool of choice. The dashboard does not assert a match — you decide.
+
+#### Path 2 — Command line
+
+If you prefer to run R yourself:
+
+```bash
+# 1. Fetch the count tables (and Lib4 reference, ~3 GB total) from Dropbox.
+bash scripts/download_data.sh                    # macOS / Linux
+pwsh scripts/download_data.ps1                   # Windows PowerShell
+
+# 2. The script places the count tables at the canonical paths the R script expects:
+#    project_data/alignment_results/{ovarian_cancer,T_cell_activation}/
+
+# 3. From a directory containing the count tables and the metadata file
+#    `all_enhancer_metadata_111525.csv`, run the manuscript's Step 9 script.
+#    Easiest is via the bundled Docker image so the R + tidyverse versions match
+#    the ones we used:
+docker run --rm \
+  -v "$(pwd)/project_data/alignment_results/ovarian_cancer:/work" \
+  -v "$(pwd)/codes/3. Post_HPC_enhancer_activity_analysis_scripts/required_metadata/all_enhancer_metadata_111525.csv:/work/all_enhancer_metadata_111525.csv:ro" \
+  -v "$(pwd)/codes/3. Post_HPC_enhancer_activity_analysis_scripts/code_by_projects/ovarian_cancer/ovarian_cancer_specific_enhancer_screening_analysis.R:/work/script.R:ro" \
+  -w /work \
+  ghcr.io/syntheticimmunity/trend-dashboard:latest \
+  Rscript script.R
+
+# 4. Diff against the deposited reference (also in this repo).
+diff project_data/alignment_results/ovarian_cancer/ovca_sensor_activity_result_concise.csv \
+     project_data/final_enhancer_activity_results/ovarian_cancer/ovca_sensor_activity_result_concise.csv
+```
+
+For T-cell, swap `ovarian_cancer` → `T_cell_activation` and the script name to `T_cell_activation_responsive_enhancer_screening_analysis.R`.
+
+### About numerical exactness
+
+We have verified, end-to-end via the bundled Docker image, that running the manuscript's published Step 9 R scripts against the full deposited count tables produces output that matches the deposited activity tables **bit-for-bit**: zero numeric mismatches across **3.8 million numeric cells** combined (OvCa + both T-cell donors), at the strictest possible tolerance (`rtol=0`, `atol=0`). This is the most stringent reproducibility guarantee a reviewer can ask for: bit-equivalent, not merely scientifically equivalent.
+
+---
+
 ## Running TREND on your own data
 
 This section takes you from raw FASTQs to a published-style activity table. It uses an **iterative threshold-tuning loop** because picking DNA thresholds is a human-in-the-loop decision: you have to look at per-sample DNA-coverage distributions before you can choose them sensibly. The flow:
