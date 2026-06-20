@@ -183,6 +183,29 @@ export interface RunStartRequest {
   step_filter?: string[];
 }
 
+export type VariantIdentityCall =
+  | "retained"
+  | "switched"
+  | "dual"
+  | "lost"
+  | "ambiguous";
+
+export interface VariantIdentity {
+  available: boolean;
+  tfbs_sequence: string | null;
+  assigned_tf?: string | null;
+  call?: VariantIdentityCall | null;
+  confidence?: "high" | "med" | "low" | null;
+  other_tf?: string | null;
+  dual_kind?: string | null;
+  p_ownfam?: number | null;
+  p_otherfam?: number | null;
+  margin?: number | null;
+  functionally_corroborated?: boolean;
+  target_tumor_active?: boolean;
+  activity_concordant?: boolean;
+}
+
 export const api = {
   health: () => getJson<Health>("/healthz"),
   librarySummary: () => getJson<LibrarySummary>("/library/summary"),
@@ -217,6 +240,8 @@ export const api = {
         metrics: Record<string, number | null>;
       }>;
     }>(`/library/constructs/${encodeURIComponent(id)}/performance`),
+  constructIdentity: (id: string) =>
+    getJson<VariantIdentity>(`/library/constructs/${encodeURIComponent(id)}/identity`),
   listEnhancers: (params: {
     q?: string;
     tf?: string;

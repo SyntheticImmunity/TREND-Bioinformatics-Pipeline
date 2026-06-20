@@ -19,6 +19,7 @@ import logging
 from pathlib import Path
 
 import asyncio
+import functools
 import json as _json
 from pathlib import Path
 
@@ -341,6 +342,77 @@ def library_construct_performance(construct_id: str) -> dict:
         })
 
     return {"promoter_name": construct_id, "projects": out}
+
+
+@functools.lru_cache(maxsize=1)
+def _load_variant_identity() -> dict:
+    """Variant TF-identity-scan results, keyed by TFBS sequence (loaded once).
+
+    Produced by revision_analysis/identity_scan_full.py (see IDENTITY_SCAN.md):
+    each binding site is scanned against all 6,012 ENCODE/MotifDb PWMs with
+    calibrated p-values to decide whether the variant still matches its assigned
+    TF or now matches a different one.
+    """
+    import csv
+
+    path = Path(__file__).resolve().parent / "library" / "variant_identity.csv"
+    table: dict[str, dict] = {}
+    if not path.exists():
+        return table
+    with path.open(newline="") as fh:
+        for row in csv.DictReader(fh):
+            table[row["seq"]] = row
+    return table
+
+
+@app.get("/library/constructs/{construct_id}/identity")
+def library_construct_identity(construct_id: str) -> dict:
+    """Inferred TF identity for a construct's binding site.
+
+    Sequence-based motif scan (not a binding measurement): reports whether the
+    variant's TFBS still matches its assigned TF (`retained`), now matches a
+    different TF (`switched`), matches both (`dual`), or none (`lost`/`ambiguous`),
+    with a confidence tier and—for switch/dual—functional corroboration from the
+    rest of the screen. Keyed by TFBS_sequence; method in IDENTITY_SCAN.md.
+    """
+    try:
+        result = queries.get_construct(construct_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Construct '{construct_id}' not found.")
+    construct = result.get("construct") or {}
+    # The constructs table stores the binding site in the `TFBS` column, which is
+    # the same vocabulary as the identity table's `seq` key.
+    seq = next((construct[k] for k in construct if k.lower() in ("tfbs", "tfbs_sequence")), None)
+    rec = _load_variant_identity().get(str(seq)) if seq else None
+    if rec is None:
+        return {"available": False, "tfbs_sequence": seq}
+
+    def _f(x):
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return None
+
+    def _b(x) -> bool:
+        return str(x).strip().lower() == "true"
+
+    return {
+        "available": True,
+        "tfbs_sequence": seq,
+        "assigned_tf": rec.get("assigned_tf") or None,
+        "call": rec.get("call") or None,
+        "confidence": rec.get("confidence") or None,
+        "other_tf": rec.get("other_tf") or None,
+        "dual_kind": rec.get("dual_kind") or None,
+        "p_ownfam": _f(rec.get("p_ownfam")),
+        "p_otherfam": _f(rec.get("p_otherfam")),
+        "margin": _f(rec.get("margin")),
+        "functionally_corroborated": _b(rec.get("functionally_corroborated")),
+        "target_tumor_active": _b(rec.get("target_tumor_active")),
+        "activity_concordant": _b(rec.get("activity_concordant")),
+    }
 
 
 @app.get("/preflight")
