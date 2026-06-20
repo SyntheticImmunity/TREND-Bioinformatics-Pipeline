@@ -236,6 +236,30 @@ export interface PwmDecomposition {
   gain?: number;
 }
 
+export interface SelectionAxis {
+  key: "target" | "specificity" | "basal";
+  label: string;
+  direction: "high" | "low";
+}
+export interface SelectionRow {
+  promoter: string;
+  tf: string;
+  pwm: string;
+  seq: string;
+  target: number;
+  specificity: number;
+  basal: number;
+  pareto: boolean;
+}
+export interface SelectionData {
+  project: string;
+  title: string;
+  n: number;
+  n_pareto: number;
+  axes: SelectionAxis[];
+  rows: SelectionRow[];
+}
+
 export const api = {
   health: () => getJson<Health>("/healthz"),
   librarySummary: () => getJson<LibrarySummary>("/library/summary"),
@@ -280,6 +304,8 @@ export const api = {
     getJson<{ project: string; pwm: string; title: string; rows: SelectivityPoint[] }>(
       `/results/pwm/${encodeURIComponent(pwm)}/variants?project=${encodeURIComponent(project)}`,
     ),
+  selection: (project: string) =>
+    getJson<SelectionData>(`/results/selection?project=${encodeURIComponent(project)}`),
   listEnhancers: (params: {
     q?: string;
     tf?: string;

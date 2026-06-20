@@ -843,6 +843,84 @@ def results_selectivity_scatter(
     )
 
 
+@functools.lru_cache(maxsize=4)
+def _selection_json(project: str) -> str:
+    """Candidate pool for the resource-selection tool, computed once per project.
+
+    Returns target-leaning, active enhancers (target >= 0.1, selectivity >= 1x)
+    with the three selection axes and a weight-independent Pareto-optimal flag.
+    Weighting and sequence-diversity are applied client-side so the sliders stay
+    instant; the Pareto frontier is the property that does not depend on weights,
+    so it is precomputed here.
+    """
+    import json as _json
+    import numpy as np
+
+    cfg = _SELECTIVITY_PROJECTS[project]
+    exp_col, ctrl_col, tf_col = cfg["exp_col"], cfg["ctrl_col"], cfg["tf_col"]
+    base = _project_scatter_df(project)
+    d = base.dropna(subset=[ctrl_col])
+    d = d[(d[exp_col] >= 0.1) & (d[ctrl_col] > 0)]
+    ratio = (d[exp_col] / d[ctrl_col]).to_numpy()
+    keep = ratio >= 1.0
+    d = d[keep]; ratio = ratio[keep]
+
+    t = d[exp_col].to_numpy(); b = d[ctrl_col].to_numpy()
+    n = len(t)
+    # Pareto over (target up, selectivity up, basal down): point i is dominated if
+    # some j is >= on target & selectivity and <= on basal, strictly better once.
+    pareto = np.ones(n, dtype=bool)
+    for i in range(n):
+        dom = (t >= t[i]) & (ratio >= ratio[i]) & (b <= b[i]) & (
+            (t > t[i]) | (ratio > ratio[i]) | (b < b[i])
+        )
+        if dom.any():
+            pareto[i] = False
+
+    is_tcell = project == "T_cell_activation"
+    exp_label, ctrl_label = cfg["title"].split("/")
+    mid_label = "Inducibility (stim/rest)" if is_tcell else "Specificity (OV8/IOSE)"
+    tfs = d[tf_col].astype(str).to_numpy()
+    proms = d["promoter_name"].astype(str).to_numpy()
+    ppms = d["by_ppm_name"].map(_normalize_pwm_name).to_numpy()
+    seqs = d["TFBS_sequence"].astype(str).to_numpy() if "TFBS_sequence" in d else np.array([""] * n)
+
+    rows = [
+        {
+            "promoter": proms[i], "tf": tfs[i], "pwm": ppms[i], "seq": seqs[i],
+            "target": round(float(t[i]), 3),
+            "specificity": round(float(ratio[i]), 3),
+            "basal": round(float(b[i]), 3),
+            "pareto": bool(pareto[i]),
+        }
+        for i in range(n)
+    ]
+    return _json.dumps({
+        "project": project,
+        "title": cfg["title"],
+        "n": n,
+        "n_pareto": int(pareto.sum()),
+        "axes": [
+            {"key": "target", "label": f"Target activity ({exp_label})", "direction": "high"},
+            {"key": "specificity", "label": mid_label, "direction": "high"},
+            {"key": "basal", "label": f"Basal leakage ({ctrl_label})", "direction": "low"},
+        ],
+        "rows": rows,
+    })
+
+
+@app.get("/results/selection")
+def results_selection(project: str = Query(default="ovarian_cancer")) -> Response:
+    """Resource-selection candidate pool (see _selection_json)."""
+    cfg = _SELECTIVITY_PROJECTS.get(project)
+    if not cfg:
+        raise HTTPException(status_code=400, detail=f"No config for project '{project}'.")
+    target = config.PROJECT_DATA_ROOT / "final_enhancer_activity_results" / project / cfg["csv"]
+    if not target.exists():
+        raise HTTPException(status_code=404, detail=f"Result file not found: {target}")
+    return Response(content=_selection_json(project), media_type="application/json")
+
+
 @app.get("/results/pwm/{pwm_name}/variants")
 def results_pwm_variants(
     pwm_name: str,

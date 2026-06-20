@@ -8,6 +8,7 @@ import Run from "@/pages/Run";
 import RunExample from "@/pages/RunExample";
 import Results from "@/pages/Results";
 import PwmDetail from "@/pages/PwmDetail";
+import ResourceSelector from "@/pages/ResourceSelector";
 import Project from "@/pages/Project";
 // Review-period feature; remove after manuscript acceptance — see header
 // comment in pages/Reproduce.tsx for the cleanup checklist.
@@ -20,6 +21,7 @@ const NAV: { to: string; label: string }[] = [
   { to: "/run", label: "Pipeline" },
   { to: "/run/example", label: "Install check" },
   { to: "/results", label: "Results" },
+  { to: "/select", label: "Select" },
   { to: "/project", label: "Projects" },
   // Review-period entry; remove with the route + import below + Reproduce.tsx.
   { to: "/reproduce", label: "Reproduce" },
@@ -78,6 +80,7 @@ export default function App() {
         <Route path="/run/example" element={<RunExample />} />
         <Route path="/results" element={<Results />} />
         <Route path="/results/pwm/:pwmName" element={<PwmDetail />} />
+        <Route path="/select" element={<ResourceSelector />} />
         <Route path="/project" element={<Project />} />
         {/* Review-period route; remove with the import + nav entry. */}
         <Route path="/reproduce" element={<Reproduce />} />
