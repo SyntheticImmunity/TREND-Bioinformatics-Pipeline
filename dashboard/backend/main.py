@@ -26,7 +26,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi import Path as FastAPIPath
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
@@ -401,6 +401,7 @@ def library_construct_identity(construct_id: str) -> dict:
     return {
         "available": True,
         "tfbs_sequence": seq,
+        # context-independent sequence call
         "assigned_tf": rec.get("assigned_tf") or None,
         "call": rec.get("call") or None,
         "confidence": rec.get("confidence") or None,
@@ -409,10 +410,87 @@ def library_construct_identity(construct_id: str) -> dict:
         "p_ownfam": _f(rec.get("p_ownfam")),
         "p_otherfam": _f(rec.get("p_otherfam")),
         "margin": _f(rec.get("margin")),
-        "functionally_corroborated": _b(rec.get("functionally_corroborated")),
-        "target_tumor_active": _b(rec.get("target_tumor_active")),
-        "activity_concordant": _b(rec.get("activity_concordant")),
+        # functional corroboration, per screen (context-specific)
+        "corroboration": [
+            {"project": "ovarian_cancer", "scanned": _b(rec.get("ovca_in")),
+             "corroborated": _b(rec.get("ovca_corroborated"))},
+            {"project": "T_cell_activation", "scanned": _b(rec.get("tcell_in")),
+             "corroborated": _b(rec.get("tcell_corroborated"))},
+        ],
     }
+
+
+@functools.lru_cache(maxsize=1)
+def _load_pwm_variants():
+    """Per-PWM variant table (project, pwm, tf, promoter, exp, ctrl, affinity,
+    log2r) for the decomposition panel. Built by build_pwm_variants.py."""
+    import pandas as pd
+
+    path = Path(__file__).resolve().parent / "library" / "pwm_variants.csv"
+    if not path.exists():
+        return None
+    return pd.read_csv(path)
+
+
+_DECOMP_FLOOR = 0.1  # min experimental activity for the "best" variant to be real
+
+
+@app.get("/results/pwm/{pwm_name}/decomposition")
+def results_pwm_decomposition(pwm_name: str, project: str = Query(default="ovarian_cancer")) -> dict:
+    """Variant-activity decomposition for one motif (addresses R1: variants tune
+    activity in the target cell, not specificity).
+
+    Returns every quantified variant of the PWM positioned in experimental-vs-
+    control activity space, with its relative motif affinity, and marks the
+    consensus (highest-affinity) and best (most target-selective) variant plus
+    the consensus->best shift decomposed into delta-experimental / delta-control.
+    """
+    import numpy as np
+
+    df = _load_pwm_variants()
+    cfg = _SELECTIVITY_PROJECTS.get(project)
+    if df is None or cfg is None:
+        return {"available": False, "pwm": pwm_name, "project": project}
+    g = df[(df["project"] == project) & (df["pwm"] == pwm_name)]
+    if g.empty:
+        return {"available": False, "pwm": pwm_name, "project": project}
+
+    cons = g.loc[g["affinity"].idxmax()]
+    elig = g[g["exp"] >= _DECOMP_FLOOR]
+    best = elig.loc[elig["log2r"].idxmax()] if not elig.empty else None
+    exp_label, ctrl_label = cfg["title"].split("/")
+
+    def _pt(r) -> dict:
+        return {
+            "promoter": str(r["promoter"]),
+            "exp": float(r["exp"]),
+            "ctrl": float(r["ctrl"]),
+            "affinity": float(r["affinity"]),
+            "log2r": float(r["log2r"]),
+        }
+
+    variants = [_pt(r) for _, r in g.iterrows()]
+    out = {
+        "available": True,
+        "pwm": pwm_name,
+        "project": project,
+        "tf": str(cons["tf"]),
+        "exp_label": exp_label,
+        "ctrl_label": ctrl_label,
+        "title": cfg["title"],
+        "floor": _DECOMP_FLOOR,
+        "n": len(variants),
+        "variants": variants,
+        "consensus": _pt(cons),
+    }
+    if best is not None and str(best["promoter"]) != str(cons["promoter"]):
+        d_exp = float(np.log2(best["exp"] / cons["exp"])) if cons["exp"] > 0 else None
+        d_ctrl = float(np.log2(best["ctrl"] / cons["ctrl"])) if cons["ctrl"] > 0 else None
+        out["best"] = _pt(best)
+        out["d_exp"] = round(d_exp, 3) if d_exp is not None else None
+        out["d_ctrl"] = round(d_ctrl, 3) if d_ctrl is not None else None
+        out["gain"] = round(float(2 ** (best["log2r"] - cons["log2r"])), 2)
+    return out
 
 
 @app.get("/preflight")
@@ -672,49 +750,34 @@ _SELECTIVITY_PROJECTS: dict[str, dict[str, str]] = {
 }
 
 
-@app.get("/results/selectivity_scatter")
-def results_selectivity_scatter(
-    project: str = Query(default="ovarian_cancer"),
-    selectivity_threshold: float = Query(default=2.0, description="log2 fold-change cutoff for highlighting selective enhancers."),
-    min_activity: float = Query(default=0.1, description="Minimum experimental RD ratio to include."),
-) -> dict:
-    """Strip-plot source data, project-agnostic.
+@functools.lru_cache(maxsize=4)
+def _project_scatter_df(project: str):
+    """Read + transform one project's result CSV once (cached; static data).
 
-    Each project supplies its own experimental/control columns; we map them
-    onto a single OVR/IOSE shape:
-      x = log2(experimental / control)
-      y = log10(experimental)
+    Returns a DataFrame with log2_selectivity / log10_activity computed and rows
+    lacking activity/ratio dropped. Callers must not mutate the result.
     """
     import math
     import pandas as pd
 
-    cfg = _SELECTIVITY_PROJECTS.get(project)
-    if not cfg:
-        raise HTTPException(
-            status_code=400,
-            detail=f"No strip-plot config for project '{project}'.",
-        )
-
-    target = (
-        config.PROJECT_DATA_ROOT / "final_enhancer_activity_results" / project / cfg["csv"]
-    )
-    if not target.exists():
-        raise HTTPException(status_code=404, detail=f"Result file not found: {target}")
-
-    exp_col, ctrl_col, ratio_col, tf_col = cfg["exp_col"], cfg["ctrl_col"], cfg["ratio_col"], cfg["tf_col"]
-
+    cfg = _SELECTIVITY_PROJECTS[project]
+    target = config.PROJECT_DATA_ROOT / "final_enhancer_activity_results" / project / cfg["csv"]
+    exp_col, ratio_col = cfg["exp_col"], cfg["ratio_col"]
     df = pd.read_csv(target)
     df = df.dropna(subset=[exp_col, ratio_col])
-    df = df[(df[exp_col] > min_activity) & (df[ratio_col] > 0)]
+    df = df[(df[exp_col] > 0) & (df[ratio_col] > 0)]
+    df["log2_selectivity"] = df[ratio_col].apply(lambda v: math.log2(v))
+    df["log10_activity"] = df[exp_col].apply(lambda v: math.log10(v))
+    return df
 
-    df["log2_selectivity"] = df[ratio_col].apply(lambda v: math.log2(v) if v > 0 else None)
-    df["log10_activity"] = df[exp_col].apply(lambda v: math.log10(v) if v > 0 else None)
-    df = df.dropna(subset=["log2_selectivity", "log10_activity"])
 
-    df["selective"] = df["log2_selectivity"] >= selectivity_threshold
-    df = df.sort_values("log2_selectivity", ascending=True).reset_index(drop=True)
+def _scatter_rows(df, cfg: dict, threshold: float) -> list[dict]:
+    """Build the strip-plot row dicts (one per variant) from a prepared df."""
+    import pandas as pd
 
-    rows = [
+    exp_col, ctrl_col, ratio_col, tf_col = cfg["exp_col"], cfg["ctrl_col"], cfg["ratio_col"], cfg["tf_col"]
+    d = df.sort_values("log2_selectivity", ascending=True)
+    return [
         {
             "promoter_name": str(r.promoter_name),
             "tf": str(getattr(r, tf_col)) if pd.notna(getattr(r, tf_col)) else "",
@@ -726,14 +789,28 @@ def results_selectivity_scatter(
             "selectivity_ratio": round(float(getattr(r, ratio_col)), 3),
             "ov8_activity": round(float(getattr(r, exp_col)), 3),
             "iose_activity": round(float(getattr(r, ctrl_col)), 3) if pd.notna(getattr(r, ctrl_col)) else None,
-            "selective": bool(r.selective),
+            "selective": bool(r.log2_selectivity >= threshold),
         }
-        for r in df.itertuples()
+        for r in d.itertuples()
     ]
+
+
+@functools.lru_cache(maxsize=8)
+def _selectivity_scatter_json(project: str, selectivity_threshold: float, min_activity: float) -> str:
+    """Strip-plot payload, computed + serialized once per parameter set.
+
+    Returning a pre-built JSON string (served via a raw Response) skips FastAPI's
+    per-row jsonable_encoder, which dominated latency on the ~40k-row payload.
+    """
+    import json as _json
+
+    cfg = _SELECTIVITY_PROJECTS[project]
+    base = _project_scatter_df(project)
+    df = base[base[cfg["exp_col"]] > min_activity]
+    rows = _scatter_rows(df, cfg, selectivity_threshold)
     n_selective = sum(1 for r in rows if r["selective"])
     top10 = sorted(rows, key=lambda r: -r["x"])[:10]
-
-    return {
+    return _json.dumps({
         "project": project,
         "selectivity_threshold": selectivity_threshold,
         "min_activity": min_activity,
@@ -744,7 +821,48 @@ def results_selectivity_scatter(
         "y_label": f"log10({cfg['title'].split('/')[0]} RD ratio)",
         "rows": rows,
         "top_selective": top10,
-    }
+    })
+
+
+@app.get("/results/selectivity_scatter")
+def results_selectivity_scatter(
+    project: str = Query(default="ovarian_cancer"),
+    selectivity_threshold: float = Query(default=2.0, description="log2 fold-change cutoff for highlighting selective enhancers."),
+    min_activity: float = Query(default=0.1, description="Minimum experimental RD ratio to include."),
+) -> Response:
+    """Strip-plot source data, project-agnostic (whole-library cloud)."""
+    cfg = _SELECTIVITY_PROJECTS.get(project)
+    if not cfg:
+        raise HTTPException(status_code=400, detail=f"No strip-plot config for project '{project}'.")
+    target = config.PROJECT_DATA_ROOT / "final_enhancer_activity_results" / project / cfg["csv"]
+    if not target.exists():
+        raise HTTPException(status_code=404, detail=f"Result file not found: {target}")
+    return Response(
+        content=_selectivity_scatter_json(project, selectivity_threshold, min_activity),
+        media_type="application/json",
+    )
+
+
+@app.get("/results/pwm/{pwm_name}/variants")
+def results_pwm_variants(
+    pwm_name: str,
+    project: str = Query(default="ovarian_cancer"),
+    selectivity_threshold: float = Query(default=2.0),
+    min_activity: float = Query(default=0.1),
+) -> dict:
+    """One motif's variants in strip-plot row shape — the few rows the PWM detail
+    page needs, instead of fetching the whole library and filtering client-side."""
+    cfg = _SELECTIVITY_PROJECTS.get(project)
+    if not cfg:
+        raise HTTPException(status_code=400, detail=f"No config for project '{project}'.")
+    target = config.PROJECT_DATA_ROOT / "final_enhancer_activity_results" / project / cfg["csv"]
+    if not target.exists():
+        raise HTTPException(status_code=404, detail=f"Result file not found: {target}")
+    base = _project_scatter_df(project)
+    df = base[base[cfg["exp_col"]] > min_activity]
+    df = df[df["by_ppm_name"].map(_normalize_pwm_name) == pwm_name]
+    return {"project": project, "pwm": pwm_name, "title": cfg["title"],
+            "rows": _scatter_rows(df, cfg, selectivity_threshold)}
 
 
 @app.get("/results/projects")

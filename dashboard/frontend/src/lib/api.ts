@@ -190,6 +190,12 @@ export type VariantIdentityCall =
   | "lost"
   | "ambiguous";
 
+export interface IdentityCorroboration {
+  project: string;
+  scanned: boolean;
+  corroborated: boolean;
+}
+
 export interface VariantIdentity {
   available: boolean;
   tfbs_sequence: string | null;
@@ -201,9 +207,33 @@ export interface VariantIdentity {
   p_ownfam?: number | null;
   p_otherfam?: number | null;
   margin?: number | null;
-  functionally_corroborated?: boolean;
-  target_tumor_active?: boolean;
-  activity_concordant?: boolean;
+  corroboration?: IdentityCorroboration[];
+}
+
+export interface DecompVariant {
+  promoter: string;
+  exp: number;
+  ctrl: number;
+  affinity: number;
+  log2r: number;
+}
+
+export interface PwmDecomposition {
+  available: boolean;
+  pwm: string;
+  project: string;
+  tf?: string;
+  exp_label?: string;
+  ctrl_label?: string;
+  title?: string;
+  floor?: number;
+  n?: number;
+  variants?: DecompVariant[];
+  consensus?: DecompVariant;
+  best?: DecompVariant;
+  d_exp?: number | null;
+  d_ctrl?: number | null;
+  gain?: number;
 }
 
 export const api = {
@@ -242,6 +272,14 @@ export const api = {
     }>(`/library/constructs/${encodeURIComponent(id)}/performance`),
   constructIdentity: (id: string) =>
     getJson<VariantIdentity>(`/library/constructs/${encodeURIComponent(id)}/identity`),
+  pwmDecomposition: (pwm: string, project: string) =>
+    getJson<PwmDecomposition>(
+      `/results/pwm/${encodeURIComponent(pwm)}/decomposition?project=${encodeURIComponent(project)}`,
+    ),
+  pwmVariants: (pwm: string, project: string) =>
+    getJson<{ project: string; pwm: string; title: string; rows: SelectivityPoint[] }>(
+      `/results/pwm/${encodeURIComponent(pwm)}/variants?project=${encodeURIComponent(project)}`,
+    ),
   listEnhancers: (params: {
     q?: string;
     tf?: string;

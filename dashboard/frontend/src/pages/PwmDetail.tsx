@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type SelectivityPoint } from "@/lib/api";
 import { SequenceLogo } from "@/components/SequenceLogo";
 import { PpmRankChart, type RankMetric } from "@/components/PpmRankChart";
+import { VariantDecomposition } from "@/components/VariantDecomposition";
 import { cn } from "@/lib/cn";
 
 type SortCol =
@@ -86,8 +87,8 @@ export default function PwmDetail() {
   }
 
   const { data: scatter, isPending: scatterPending, error: scatterError } = useQuery({
-    queryKey: ["selectivity-scatter", project],
-    queryFn: () => api.selectivityScatter(project),
+    queryKey: ["pwm-variants", pwmName, project],
+    queryFn: () => api.pwmVariants(pwmName, project),
   });
 
   const { data: pwmData, isPending: pwmsPending } = useQuery({
@@ -98,17 +99,16 @@ export default function PwmDetail() {
 
   const ppm = pwmData?.pwms?.[pwmName];
 
-  // All rows for this specific PPM (PPM names normalized server-side, so the
-  // 10 `_v1`..`_v10` design variants collapse into one `by_ppm_name`).
-  // Always passed to the rank chart in design-rank ascending order regardless
-  // of the user's chosen table sort.
+  // Rows for this PPM, fetched directly from the per-PWM endpoint (PPM names
+  // normalized server-side, so the 10 `_v1`..`_v10` design variants collapse
+  // into one `by_ppm_name`). Sorted in design-rank order for the rank chart
+  // regardless of the user's chosen table sort.
   const pwmRows = useMemo(() => {
     if (!scatter) return [] as SelectivityPoint[];
     return scatter.rows
-      .filter((r) => r.by_ppm_name === pwmName)
       .slice()
       .sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999));
-  }, [scatter, pwmName]);
+  }, [scatter]);
 
   const tf = pwmRows[0]?.tf ?? null;
 
@@ -214,6 +214,8 @@ export default function PwmDetail() {
           />
         )}
       </section>
+
+      <VariantDecomposition pwm={pwmName} project={project} />
 
       <section className="mt-8 card">
         <h2 className="text-card-title font-semibold">

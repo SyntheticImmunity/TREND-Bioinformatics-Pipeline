@@ -42,7 +42,12 @@ function identitySummary(d: VariantIdentity): string {
   }
 }
 
-function IdentityCard({ d }: { d: VariantIdentity }) {
+const PROJECT_META: Record<string, { label: string; cells: string }> = {
+  ovarian_cancer: { label: "Ovarian cancer", cells: "tumour cells" },
+  T_cell_activation: { label: "T-cell activation", cells: "activated T cells" },
+};
+
+function IdentityCard({ d, fromProject }: { d: VariantIdentity; fromProject: string | null }) {
   if (!d.available || !d.call) return null;
   const style = CALL_STYLE[d.call] ?? CALL_STYLE.ambiguous;
   const callLabel =
@@ -50,6 +55,7 @@ function IdentityCard({ d }: { d: VariantIdentity }) {
       ? `${style.label} · ${d.dual_kind === "distinct" ? "two sites" : "shared site"}`
       : style.label;
   const isSwitchDual = d.call === "switched" || d.call === "dual";
+  const corroboration = d.corroboration ?? [];
   return (
     <section className="mt-8 card">
       <h2 className="text-card-title font-semibold">Inferred TF identity</h2>
@@ -62,19 +68,9 @@ function IdentityCard({ d }: { d: VariantIdentity }) {
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${style.cls}`}>{callLabel}</span>
         {d.confidence && (
           <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${CONF_STYLE[d.confidence]}`}>
-            {d.confidence} confidence
+            {d.confidence} sequence confidence
           </span>
         )}
-        {isSwitchDual &&
-          (d.functionally_corroborated ? (
-            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
-              functionally corroborated
-            </span>
-          ) : (
-            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-600">
-              not corroborated
-            </span>
-          ))}
       </div>
 
       <p className="mt-4 text-sm text-charcoal-82">{identitySummary(d)}</p>
@@ -92,16 +88,45 @@ function IdentityCard({ d }: { d: VariantIdentity }) {
             </dd>
           </>
         )}
-        {isSwitchDual && d.functionally_corroborated && (
-          <>
-            <dt className="text-muted">Functional support for {d.other_tf}</dt>
-            <dd className="text-charcoal">
-              its own sensors are tumour-active and this variant&apos;s activity matches them
-            </dd>
-          </>
-        )}
       </dl>
 
+      {isSwitchDual && corroboration.length > 0 && (
+        <div className="mt-5">
+          <p className="text-xs text-muted">
+            Functional support for {d.other_tf} — is it an active driver in each screen?
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {corroboration.map((c) => {
+              const meta = PROJECT_META[c.project] ?? { label: c.project, cells: "the active state" };
+              const current = c.project === fromProject;
+              return (
+                <li
+                  key={c.project}
+                  className={`flex items-start gap-2 rounded-comfortable border px-3 py-2 text-xs ${
+                    current
+                      ? "border-cream-border bg-cream-light"
+                      : "border-transparent bg-transparent"
+                  }`}
+                >
+                  <span aria-hidden className="mt-px">
+                    {!c.scanned ? "•" : c.corroborated ? "✓" : "✗"}
+                  </span>
+                  <span className="text-charcoal-82">
+                    <span className="font-medium text-charcoal">{meta.label}</span>
+                    {current && <span className="ml-1 text-[10px] text-muted">(this screen)</span>}
+                    {": "}
+                    {!c.scanned
+                      ? "not measured in this screen"
+                      : c.corroborated
+                        ? `corroborated — ${d.other_tf} drives ${meta.cells} and this variant's activity matches its sensors`
+                        : `not corroborated — ${d.other_tf} is not an active driver here`}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
@@ -248,7 +273,7 @@ export default function ConstructDetail() {
         </section>
       )}
 
-      {identity && <IdentityCard d={identity} />}
+      {identity && <IdentityCard d={identity} fromProject={fromProject} />}
 
       {data && (
         <section className="mt-8 card">
