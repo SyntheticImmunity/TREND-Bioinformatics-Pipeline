@@ -240,6 +240,19 @@ def _enhancer_order_sql(sort_by: str, sort_dir: str) -> str:
     return f"ORDER BY {sort_expr} {sort_dir_sql}, TF ASC, rank ASC, TFBS_sequence ASC, by_ppm_name ASC"
 
 
+def _apply_call_filter(con, where_sql: str, call_seqs) -> str:
+    """AND a TF-identity-call filter into where_sql via a per-connection temp
+    table of matching TFBS sequences. `call_seqs` is an iterable of sequences
+    (the identity scan lives outside the DB, so the caller resolves which
+    sequences match the chosen call and passes them here)."""
+    if call_seqs is None:
+        return where_sql
+    con.execute("CREATE TEMP TABLE _idfilter (seq TEXT PRIMARY KEY)")
+    con.executemany("INSERT OR IGNORE INTO _idfilter(seq) VALUES (?)", ((s,) for s in call_seqs))
+    clause = "TFBS_sequence IN (SELECT seq FROM _idfilter)"
+    return (where_sql + " AND " + clause) if where_sql else (" WHERE " + clause)
+
+
 def list_enhancers(
     *,
     q: str | None = None,
@@ -254,6 +267,7 @@ def list_enhancers(
     ppm_contains: str | None = None,
     vr_contains: str | None = None,
     dbd_contains: str | None = None,
+    call_seqs=None,
     sort_by: str = "TF",
     sort_dir: str = "asc",
     limit: int = 100,
@@ -286,6 +300,7 @@ def list_enhancers(
     order_sql = _enhancer_order_sql(sort_by, sort_dir)
 
     with _connect(db_path) as con:
+        where_sql = _apply_call_filter(con, where_sql, call_seqs)
         total = con.execute(
             f"SELECT COUNT(*) FROM enhancers{where_sql}", params
         ).fetchone()[0]
@@ -324,6 +339,7 @@ def iter_enhancers_for_export(
     ppm_contains: str | None = None,
     vr_contains: str | None = None,
     dbd_contains: str | None = None,
+    call_seqs=None,
     sort_by: str = "TF",
     sort_dir: str = "asc",
     db_path: Path = config.LIBRARY_DB,
@@ -340,6 +356,7 @@ def iter_enhancers_for_export(
     order_sql = _enhancer_order_sql(sort_by, sort_dir)
 
     with _connect(db_path) as con:
+        where_sql = _apply_call_filter(con, where_sql, call_seqs)
         cur = con.execute(
             f"""
             SELECT TF, TF_name_by_PPM, TFBS_sequence, variable_region,

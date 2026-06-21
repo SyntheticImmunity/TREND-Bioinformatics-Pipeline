@@ -177,13 +177,14 @@ def library_enhancers(
     ppm_contains: str | None = Query(default=None, description="Substring filter on PPM identifier."),
     vr_contains: str | None = Query(default=None, description="Substring filter on variable region."),
     dbd_contains: str | None = Query(default=None, description="Substring filter on Lambert DBD family."),
+    call: str | None = Query(default=None, description="TF-identity call filter (retained/switched/dual/lost/ambiguous)."),
     sort_by: str = Query(default="TF", description="Column to sort by."),
     sort_dir: str = Query(default="asc", pattern="^(asc|desc)$"),
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ) -> dict:
     """Enhancer-level paginated table: one row per designed enhancer
-    (multibarcode-collapsed), with n_barcodes attached."""
+    (multibarcode-collapsed), with n_barcodes and inferred TF identity attached."""
     try:
         page = queries.list_enhancers(
             q=q,
@@ -198,6 +199,7 @@ def library_enhancers(
             ppm_contains=ppm_contains,
             vr_contains=vr_contains,
             dbd_contains=dbd_contains,
+            call_seqs=_identity_call_seqs(call) if call else None,
             sort_by=sort_by,
             sort_dir=sort_dir,
             limit=limit,
@@ -205,13 +207,21 @@ def library_enhancers(
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    identity = _load_variant_identity()
+    rows = []
+    for r in page.rows:
+        d = r.__dict__
+        rec = identity.get(str(d.get("TFBS_sequence")))
+        d["identity_call"] = rec.get("call") if rec else None
+        d["identity_confidence"] = rec.get("confidence") if rec else None
+        rows.append(d)
     return {
         "total": page.total,
         "offset": page.offset,
         "limit": page.limit,
         "sort_by": sort_by,
         "sort_dir": sort_dir,
-        "rows": [r.__dict__ for r in page.rows],
+        "rows": rows,
     }
 
 
@@ -229,6 +239,7 @@ def library_enhancers_export(
     ppm_contains: str | None = Query(default=None),
     vr_contains: str | None = Query(default=None),
     dbd_contains: str | None = Query(default=None),
+    call: str | None = Query(default=None),
     sort_by: str = Query(default="TF"),
     sort_dir: str = Query(default="asc", pattern="^(asc|desc)$"),
 ) -> StreamingResponse:
@@ -248,7 +259,10 @@ def library_enhancers_export(
         ("by_ppm_name", "PPM Name"),
         ("rank", "Rank"),
         ("n_barcodes", "# Barcodes"),
+        ("identity_call", "TF identity"),
+        ("identity_confidence", "Identity confidence"),
     ]
+    identity = _load_variant_identity()
 
     try:
         row_iter = queries.iter_enhancers_for_export(
@@ -256,6 +270,7 @@ def library_enhancers_export(
             dbd_family=dbd_family, cacts_tumor=cacts_tumor, dalessio_system=dalessio_system,
             tf_contains=tf_contains, tfbs_contains=tfbs_contains, ppm_contains=ppm_contains,
             vr_contains=vr_contains, dbd_contains=dbd_contains,
+            call_seqs=_identity_call_seqs(call) if call else None,
             sort_by=sort_by, sort_dir=sort_dir,
         )
     except FileNotFoundError as exc:
@@ -269,6 +284,9 @@ def library_enhancers_export(
         BATCH = 500
         for row in row_iter:
             d = row.__dict__
+            rec = identity.get(str(d.get("TFBS_sequence")))
+            d["identity_call"] = rec.get("call") if rec else None
+            d["identity_confidence"] = rec.get("confidence") if rec else None
             writer.writerow([d.get(field, "") if d.get(field) is not None else "" for field, _ in columns])
             n += 1
             if n >= BATCH:
@@ -363,6 +381,12 @@ def _load_variant_identity() -> dict:
         for row in csv.DictReader(fh):
             table[row["seq"]] = row
     return table
+
+
+@functools.lru_cache(maxsize=8)
+def _identity_call_seqs(call: str) -> frozenset:
+    """TFBS sequences whose inferred identity call matches `call` (cached)."""
+    return frozenset(seq for seq, rec in _load_variant_identity().items() if rec.get("call") == call)
 
 
 @app.get("/library/constructs/{construct_id}/identity")

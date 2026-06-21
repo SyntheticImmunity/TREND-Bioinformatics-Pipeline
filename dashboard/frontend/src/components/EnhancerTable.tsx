@@ -15,7 +15,7 @@ const VARIABLE_REGION_PREVIEW = 24;
 type SortDir = "asc" | "desc";
 
 interface ColumnDef {
-  id: EnhancerSortColumn | "DBD_family";
+  id: EnhancerSortColumn | "DBD_family" | "identity";
   header: string;
   align?: "left" | "right";
   width?: string;
@@ -27,9 +27,19 @@ const COLUMNS: ColumnDef[] = [
   { id: "TFBS_sequence", header: "TFBS" },
   { id: "variable_region", header: "Variable Region" },
   { id: "by_ppm_name", header: "PPM Name" },
+  { id: "identity", header: "TF identity" },
   { id: "rank", header: "Rank", align: "right" },
   { id: "n_barcodes", header: "# Barcodes", align: "right" },
 ];
+
+const CALL_OPTIONS = ["retained", "switched", "dual", "lost", "ambiguous"] as const;
+const CALL_BADGE: Record<string, string> = {
+  retained: "bg-emerald-50 text-emerald-700",
+  switched: "bg-amber-50 text-amber-700",
+  dual: "bg-indigo-50 text-indigo-700",
+  lost: "bg-rose-50 text-rose-700",
+  ambiguous: "bg-zinc-100 text-zinc-600",
+};
 
 // Sortable subset — matches the backend ENHANCER_SORT_COLUMNS whitelist.
 const SORTABLE_COLUMN_IDS = new Set<string>([
@@ -102,6 +112,7 @@ export function EnhancerTable() {
   const debouncedSearch = useDebounced(searchInput, SEARCH_DEBOUNCE_MS);
   const [colFilters, setColFilters] = useState<Record<string, string>>({});
   const debouncedColFilters = useDebounced(colFilters, SEARCH_DEBOUNCE_MS);
+  const [callFilter, setCallFilter] = useState<string>("");
   const [sortBy, setSortBy] = useState<EnhancerSortColumn>("TF");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(0);
@@ -112,11 +123,11 @@ export function EnhancerTable() {
   // Reset to first page whenever the search, sort, panel filter, OR page size changes.
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, colFiltersKey, sortBy, sortDir, filter.kind, filter.value, pageSize]);
+  }, [debouncedSearch, colFiltersKey, callFilter, sortBy, sortDir, filter.kind, filter.value, pageSize]);
 
   const offset = page * pageSize;
   const { data, isPending, error, isFetching } = useQuery({
-    queryKey: ["enhancers", debouncedSearch, colFiltersKey, sortBy, sortDir, offset, pageSize, filter.kind, filter.value],
+    queryKey: ["enhancers", debouncedSearch, colFiltersKey, callFilter, sortBy, sortDir, offset, pageSize, filter.kind, filter.value],
     queryFn: () =>
       api.listEnhancers({
         q: debouncedSearch || undefined,
@@ -125,6 +136,7 @@ export function EnhancerTable() {
         tfbs_contains: debouncedColFilters["TFBS_sequence"] || undefined,
         vr_contains: debouncedColFilters["variable_region"] || undefined,
         ppm_contains: debouncedColFilters["by_ppm_name"] || undefined,
+        call: callFilter || undefined,
         dbd_family: filter.kind === "dbd_family" && filter.value ? filter.value : undefined,
         cacts_tumor: filter.kind === "cacts_tumor" && filter.value ? filter.value : undefined,
         dalessio_system: filter.kind === "dalessio_system" && filter.value ? filter.value : undefined,
@@ -191,6 +203,7 @@ export function EnhancerTable() {
             tfbs_contains: debouncedColFilters["TFBS_sequence"] || undefined,
             vr_contains: debouncedColFilters["variable_region"] || undefined,
             ppm_contains: debouncedColFilters["by_ppm_name"] || undefined,
+            call: callFilter || undefined,
             dbd_family: filter.kind === "dbd_family" && filter.value ? filter.value : undefined,
             cacts_tumor: filter.kind === "cacts_tumor" && filter.value ? filter.value : undefined,
             dalessio_system: filter.kind === "dalessio_system" && filter.value ? filter.value : undefined,
@@ -244,6 +257,23 @@ export function EnhancerTable() {
             </tr>
             <tr>
               {COLUMNS.map((c) => {
+                if (c.id === "identity") {
+                  return (
+                    <th key="identity-filter" className="pb-2 pr-4 font-normal align-middle text-center">
+                      <select
+                        value={callFilter}
+                        onChange={(e) => setCallFilter(e.target.value)}
+                        aria-label="Filter by TF identity call"
+                        className="w-full bg-cream border border-cream-border rounded-standard px-2 py-1 text-xs text-charcoal-82 focus:outline-none focus:border-charcoal-40 text-center"
+                      >
+                        <option value="">All</option>
+                        {CALL_OPTIONS.map((o) => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
+                    </th>
+                  );
+                }
                 const filterKey = COLUMN_FILTER_KEYS[c.id];
                 if (!filterKey) {
                   return <th key={`${c.id}-filter`} className="pb-2 pr-4 align-middle" />;
@@ -298,6 +328,20 @@ export function EnhancerTable() {
                     </td>
                     <td className="py-2.5 pr-4 align-top">
                       <span className="text-xs">{row.by_ppm_name}</span>
+                    </td>
+                    <td className="py-2.5 pr-4 align-top">
+                      {row.identity_call ? (
+                        <span className="inline-flex items-center gap-1">
+                          <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", CALL_BADGE[row.identity_call])}>
+                            {row.identity_call}
+                          </span>
+                          {row.identity_confidence && (
+                            <span className="text-[10px] text-muted">{row.identity_confidence}</span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted">—</span>
+                      )}
                     </td>
                     <td className="py-2.5 pr-4 align-top text-right">
                       <span className="text-xs tabular-nums">{row.rank}</span>

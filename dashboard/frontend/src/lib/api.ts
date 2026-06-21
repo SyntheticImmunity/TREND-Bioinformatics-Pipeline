@@ -89,6 +89,8 @@ export interface EnhancerRow {
   Lambert_TF_assessment: string | null;
   Lambert_matched: string | null;
   n_barcodes: number;
+  identity_call?: VariantIdentityCall | null;
+  identity_confidence?: "high" | "med" | "low" | null;
 }
 
 export interface EnhancerPage {
@@ -319,6 +321,7 @@ export const api = {
     ppm_contains?: string;
     vr_contains?: string;
     dbd_contains?: string;
+    call?: string;
     sort_by?: EnhancerSortColumn;
     sort_dir?: "asc" | "desc";
     limit?: number;
@@ -337,6 +340,7 @@ export const api = {
     if (params.ppm_contains) qs.set("ppm_contains", params.ppm_contains);
     if (params.vr_contains) qs.set("vr_contains", params.vr_contains);
     if (params.dbd_contains) qs.set("dbd_contains", params.dbd_contains);
+    if (params.call) qs.set("call", params.call);
     if (params.sort_by) qs.set("sort_by", params.sort_by);
     if (params.sort_dir) qs.set("sort_dir", params.sort_dir);
     if (params.limit !== undefined) qs.set("limit", String(params.limit));
@@ -356,6 +360,7 @@ export const api = {
     ppm_contains?: string;
     vr_contains?: string;
     dbd_contains?: string;
+    call?: string;
     sort_by?: EnhancerSortColumn;
     sort_dir?: "asc" | "desc";
   }) => {
