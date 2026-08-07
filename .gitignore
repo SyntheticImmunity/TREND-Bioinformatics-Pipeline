@@ -83,3 +83,63 @@ DASHBOARD_PRD.md
 DESIGN.md
 README.legacy.md
 tools/manuscript_edit_review.html
+
+# =============================================================================
+# Build artifacts and scratch
+# =============================================================================
+.playwright-mcp/
+runs/
+dashboard/frontend/.tsbuild-node/
+*.tsbuildinfo
+**/__pycache__/
+
+# =============================================================================
+# Large per-variant supplementary tables (deposited to Zenodo, not the repo)
+# and the table raw-data copies (regenerable; the OvCa input lives in standalone/).
+# =============================================================================
+revision_analysis/paralog_resolution/*.csv
+revision_analysis/paralog_resolution/*.xlsx
+revision_analysis/revision_tables/raw_data/
+
+# =============================================================================
+# Native-enhancer benchmark: 272 MB raw BLAST round-trip dump (regenerable via
+# blast_roundtrip.py; the summary CSV blast_roundtrip_summary.csv is committed).
+# =============================================================================
+revision_analysis/native_enhancer_benchmark/blast_roundtrip_results.txt
+
+# =============================================================================
+# Local agent / tooling caches (never project content)
+# =============================================================================
+.claude/
+.firecrawl/
+
+# =============================================================================
+# Internal-only, UNPUBLISHED lab screens (prostate cancer, melanoma).
+# These belong to unpublished lab projects and must never reach the public repo
+# or the Docker image (also listed in .dockerignore). The manuscript build ships
+# only the ovarian_cancer + T_cell_activation screens. The dashboard registers
+# these from the gitignored side file below and degrades cleanly without them.
+# =============================================================================
+project_data/final_enhancer_activity_results/prostate_cancer/
+project_data/final_enhancer_activity_results/melanoma/
+dashboard/backend/internal_projects.json
+dashboard/backend/schemas/prostate_sensor_activity_concise.yaml
+dashboard/backend/schemas/melanoma_sensor_activity_concise.yaml
+
+# =============================================================================
+# Manuscript-revision working material: keep NEW files out of the public repo.
+#
+# Revision work is proprietary while the paper is under review and while the
+# figures are not finalized. This covers, among other things, business and
+# investor material, IACUC and administrative documents containing staff contact
+# details, editor and collaborator meeting notes, reviewer-response drafts, and
+# figures built from the unpublished prostate and melanoma screens above.
+#
+# Note this rule only affects UNTRACKED files. Revision files already committed
+# before this line remain tracked and continue to work normally. To publish a
+# specific finalized item later, add it deliberately with `git add -f <path>`.
+# =============================================================================
+revision_analysis/
+
+# TypeScript incremental build cache: a local build artifact, never source.
+dashboard/frontend/tsconfig.tsbuildinfo

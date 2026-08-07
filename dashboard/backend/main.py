@@ -444,6 +444,101 @@ def library_construct_identity(construct_id: str) -> dict:
     }
 
 
+def _load_variant_paralog() -> dict:
+    """Per-paralog resolution, keyed by TFBS sequence (loaded once).
+
+    Produced by revision_analysis/paralog_resolution/resolve_paralogs.py: each
+    site is scored against every individual TF's motifs to name the most-likely
+    binding factor (refining the family-level identity scan to the paralog level
+    that Reviewer 1 asked about). Covers all designed variants.
+    """
+    import csv
+
+    path = Path(__file__).resolve().parent / "library" / "variant_paralog.csv"
+    table: dict[str, dict] = {}
+    if not path.exists():
+        return table
+    with path.open(newline="") as fh:
+        for row in csv.DictReader(fh):
+            table[row["seq"]] = row
+    return table
+
+
+@app.get("/library/constructs/{construct_id}/paralog")
+def library_construct_paralog(construct_id: str) -> dict:
+    """Most-likely individual binding TF for a construct's site.
+
+    Sequence-based, refines /identity from TF-family to the individual paralog:
+    names the best-matching factor, the runners-up, and where the designed TF
+    ranks, with a degeneracy flag (the matrices in a binding-mode-sharing family
+    are near-identical, so this is direction + margin, not a binding proof).
+    """
+    try:
+        result = queries.get_construct(construct_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Construct '{construct_id}' not found.")
+    construct = result.get("construct") or {}
+    seq = next((construct[k] for k in construct if k.lower() in ("tfbs", "tfbs_sequence")), None)
+    rec = _load_variant_paralog().get(str(seq)) if seq else None
+    if rec is None:
+        return {"available": False, "tfbs_sequence": seq}
+
+    def _f(x):
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return None
+
+    def _b(x) -> bool:
+        return str(x).strip().lower() == "true"
+
+    candidates = [
+        {"tf": rec.get("best_tf") or None, "score": _f(rec.get("best_score")), "rank": 1},
+        {"tf": rec.get("second_tf") or None, "score": _f(rec.get("second_score")), "rank": 2},
+        {"tf": rec.get("third_tf") or None, "score": _f(rec.get("third_score")), "rank": 3},
+    ]
+    candidates = [c for c in candidates if c["tf"] and c["score"] is not None]
+
+    # Activity is shown for a predicted shift only, as NEUTRAL context about
+    # whether THIS variant is a functional enhancer here — never as a verdict on
+    # identity. (A silent variant is simply weak; the designed TF is usually also
+    # active in the screen, so silence does not adjudicate which factor binds.)
+    call = rec.get("paralog_call")
+    best_tf, assigned_tf = rec.get("best_tf"), rec.get("assigned_tf")
+    is_shift = call in ("within_family_shift", "cross_family_shift") or (
+        call == "degenerate_assigned_plausible" and best_tf != assigned_tf)
+    act_on = _f(rec.get("act_on"))
+    activity = "none"
+    if is_shift and act_on is not None:
+        if act_on >= 1.0:
+            activity = "consistent"   # active here -> a functional element
+        elif act_on < 0.5:
+            activity = "low"          # weak here -> activity is uninformative
+
+    return {
+        "available": True,
+        "tfbs_sequence": seq,
+        "assigned_tf": assigned_tf or None,
+        "best_tf": best_tf or None,
+        "best_p": _f(rec.get("best_p")),
+        "call": call or None,
+        "confidence": rec.get("confidence") or None,
+        "resolution": rec.get("resolution") or None,
+        "within_family": _b(rec.get("within_family")),
+        "assigned_rank": int(_f(rec.get("assigned_rank")) or 0),
+        "assigned_score": _f(rec.get("assigned_score")),
+        "delta_best_assigned": _f(rec.get("delta_best_assigned")),
+        "candidates": candidates,
+        # relative motif affinity (1.00 = consensus); null where not quantified
+        "rel_affinity": _f(rec.get("rel_affinity")),
+        # neutral activity context for a predicted shift (may be "none")
+        "activity": activity,
+        "act_on": act_on,
+    }
+
+
 @functools.lru_cache(maxsize=1)
 def _load_pwm_variants():
     """Per-PWM variant table (project, pwm, tf, promoter, exp, ctrl, affinity,
@@ -773,6 +868,15 @@ _SELECTIVITY_PROJECTS: dict[str, dict[str, str]] = {
     },
 }
 
+# Optional internal-only projects (unpublished lab data) are registered from a
+# gitignored + dockerignored side file that is present in the lab's local build
+# and absent from public GitHub/Docker deployments. When that file is missing —
+# or when TREND_PUBLIC_ONLY is set — only the two manuscript projects above are
+# served, and every /results endpoint degrades cleanly because the internal CSVs
+# are gone too (lookups just return 404/unavailable). Nothing in committed source
+# names those projects. See config.load_internal_selectivity_projects.
+_SELECTIVITY_PROJECTS.update(config.load_internal_selectivity_projects())
+
 
 @functools.lru_cache(maxsize=4)
 def _project_scatter_df(project: str):
@@ -988,6 +1092,11 @@ def results_projects() -> dict:
             projects.append({"name": d.name, "files": sorted(p.name for p in d.glob("*.csv"))})
     for d in sorted(on_disk.values(), key=lambda p: p.name):
         projects.append({"name": d.name, "files": sorted(p.name for p in d.glob("*.csv"))})
+    # In forced public mode, hide internal-only projects even if their data still
+    # sits on the local disk — lets the lab preview the exact deployable build.
+    if config.public_only():
+        hidden = config.internal_project_names()
+        projects = [p for p in projects if p["name"] not in hidden]
     return {"projects": projects}
 
 

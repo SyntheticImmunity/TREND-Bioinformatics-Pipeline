@@ -1,0 +1,35 @@
+# Docker build-context exclusions for the public TREND image.
+# The Dockerfile does `COPY . /app` from the repo root, so anything not excluded
+# here is baked into the shipped image. Keep unpublished data and local cruft out.
+
+# -----------------------------------------------------------------------------
+# Internal-only, unpublished lab screens (prostate cancer, melanoma).
+# Never bake these into the public image; the manuscript build ships only the
+# ovarian_cancer + T_cell_activation screens.
+# -----------------------------------------------------------------------------
+project_data/final_enhancer_activity_results/prostate_cancer/
+project_data/final_enhancer_activity_results/melanoma/
+dashboard/backend/internal_projects.json
+dashboard/backend/schemas/prostate_sensor_activity_concise.yaml
+dashboard/backend/schemas/melanoma_sensor_activity_concise.yaml
+
+# -----------------------------------------------------------------------------
+# Hygiene: smaller image, no local-only state or build artifacts.
+# -----------------------------------------------------------------------------
+.git/
+.github/
+**/__pycache__/
+**/*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dashboard/frontend/node_modules/
+dashboard/frontend/.vite/
+dashboard/backend/state/*.sqlite
+data_download/
+.claude/
+.firecrawl/
+.DS_Store
+Thumbs.db

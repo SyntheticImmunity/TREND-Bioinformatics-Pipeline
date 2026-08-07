@@ -65,3 +65,65 @@ def is_container_mode() -> bool:
 # Equivalence tolerances - shared between FR-4 oracle and C2 tests.
 DEFAULT_RTOL = 1e-6
 DEFAULT_ATOL = 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Internal-only projects (unpublished lab data).
+#
+# The manuscript deployment (public GitHub repo + Docker image) ships only the
+# ovarian_cancer and T_cell_activation screens. Additional lab screens whose
+# data is unpublished are registered from this side file, which is gitignored
+# AND dockerignored: present in the lab's local build, absent from any public
+# artifact. Their result CSVs live under project_data/ and are excluded the same
+# way. Committed source never names those projects, so the public repo carries
+# no trace of them.
+# ---------------------------------------------------------------------------
+INTERNAL_PROJECTS_FILE = DASHBOARD_ROOT / "backend" / "internal_projects.json"
+
+
+def public_only() -> bool:
+    """Force public (manuscript-only) mode even when internal data is present on
+    disk. Lets the lab preview exactly what the deployed build will serve before
+    pushing. Enable with TREND_PUBLIC_ONLY=1."""
+    return os.environ.get("TREND_PUBLIC_ONLY", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _read_internal_projects() -> dict:
+    """Parse the internal-projects side file, or return {} if it is absent or
+    unreadable (the expected state in a public deployment)."""
+    import json
+
+    if not INTERNAL_PROJECTS_FILE.exists():
+        return {}
+    try:
+        data = json.loads(INTERNAL_PROJECTS_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    # Keep only real project entries: a dict value, non-underscore key (so
+    # documentation keys like "_comment" are ignored).
+    return {
+        name: cfg
+        for name, cfg in data.items()
+        if isinstance(cfg, dict) and not name.startswith("_")
+    }
+
+
+def internal_project_names() -> frozenset[str]:
+    """Names of internal-only projects declared in the side file. Empty in a
+    public deploy, where the file does not exist."""
+    return frozenset(_read_internal_projects().keys())
+
+
+def load_internal_selectivity_projects() -> dict:
+    """Strip-plot/selection configs for the internal-only projects. Empty when
+    the side file is absent (public deploy) or when public_only() is forced."""
+    if public_only():
+        return {}
+    return _read_internal_projects()

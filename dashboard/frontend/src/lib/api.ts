@@ -212,6 +212,40 @@ export interface VariantIdentity {
   corroboration?: IdentityCorroboration[];
 }
 
+export type ParalogCall =
+  | "assigned_top"
+  | "degenerate_assigned_plausible"
+  | "within_family_shift"
+  | "cross_family_shift"
+  | "unresolved";
+
+export interface ParalogCandidate {
+  tf: string | null;
+  score: number;
+  rank: number;
+}
+
+export interface VariantParalog {
+  available: boolean;
+  tfbs_sequence: string | null;
+  assigned_tf?: string | null;
+  best_tf?: string | null;
+  best_p?: number | null;
+  call?: ParalogCall | null;
+  confidence?: "high" | "med" | "low" | null;
+  resolution?: "resolved" | "degenerate" | null;
+  within_family?: boolean;
+  assigned_rank?: number;
+  assigned_score?: number | null;
+  delta_best_assigned?: number | null;
+  candidates?: ParalogCandidate[];
+  // relative motif affinity (1.00 = consensus); null where not quantified
+  rel_affinity?: number | null;
+  // neutral activity context for a PREDICTED shift only (else "none")
+  activity?: "consistent" | "low" | "none" | null;
+  act_on?: number | null;
+}
+
 export interface DecompVariant {
   promoter: string;
   exp: number;
@@ -298,6 +332,8 @@ export const api = {
     }>(`/library/constructs/${encodeURIComponent(id)}/performance`),
   constructIdentity: (id: string) =>
     getJson<VariantIdentity>(`/library/constructs/${encodeURIComponent(id)}/identity`),
+  constructParalog: (id: string) =>
+    getJson<VariantParalog>(`/library/constructs/${encodeURIComponent(id)}/paralog`),
   pwmDecomposition: (pwm: string, project: string) =>
     getJson<PwmDecomposition>(
       `/results/pwm/${encodeURIComponent(pwm)}/decomposition?project=${encodeURIComponent(project)}`,
